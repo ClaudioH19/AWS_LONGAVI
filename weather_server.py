@@ -63,6 +63,10 @@ def init_db():
 
 
 def save_reading(raw: dict):
+    # Renombrar key vacía (bug firmware BVMETEO, segundo valor del sensor temp+hum)
+    if "" in raw:
+        raw["Humidity"] = raw.pop("")
+
     conn = get_conn()
     conn.execute(
         "INSERT INTO weather_readings (received_at, raw_json) VALUES (?, ?)",
@@ -70,7 +74,6 @@ def save_reading(raw: dict):
     )
     conn.commit()
     conn.close()
-
 
 # ============================================================
 # HELPERS
