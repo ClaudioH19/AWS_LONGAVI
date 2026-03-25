@@ -5,7 +5,7 @@ Weather Station Server
 - Sin asumir nombres de campos del dispositivo
 """
 
-from flask import Flask, request, jsonify, Response, send_file
+from flask import Flask, request, jsonify, Response, send_from_directory
 import sqlite3
 import os
 import logging
@@ -15,6 +15,9 @@ import io
 from datetime import datetime
 
 app = Flask(__name__)
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIST_DIR = os.path.join(BASE_DIR, "frontend_dist")
 
 DB_PATH  = os.environ.get("DB_PATH",  "weather_data.db")
 PORT     = int(os.environ.get("PORT",  3000))
@@ -124,7 +127,15 @@ def flatten_rows(rows):
 
 @app.route("/")
 def dashboard():
-    return send_file("dashboard.html")
+    return send_from_directory(FRONTEND_DIST_DIR, "index.html")
+
+
+@app.route("/<path:path>")
+def frontend_files(path):
+    file_path = os.path.join(FRONTEND_DIST_DIR, path)
+    if os.path.isfile(file_path):
+        return send_from_directory(FRONTEND_DIST_DIR, path)
+    return send_from_directory(FRONTEND_DIST_DIR, "index.html")
 
 
 # ============================================================

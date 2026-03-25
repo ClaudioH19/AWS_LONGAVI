@@ -1,6 +1,8 @@
 services:
   weather-server:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: weather-server
     restart: unless-stopped
     ports:
