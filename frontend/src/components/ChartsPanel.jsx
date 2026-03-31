@@ -99,22 +99,27 @@ export default function ChartsPanel() {
       'devicetype',
       'deviceversion',
     ]);
-    const map = new Map();
+    // Normalización: minúsculas, sin espacios ni guiones bajos
+    const normalize = (k) => String(k).toLowerCase().replace(/\s|_/g, '');
+    const keyMap = new Map(); // normalizedKey -> originalKey
+    const countMap = new Map(); // normalizedKey -> count
 
     rows.forEach((row) => {
       Object.keys(row).forEach((key) => {
         if (excluded.has(key)) return;
-        if (!map.has(key)) map.set(key, 0);
+        const norm = normalize(key);
+        if (!keyMap.has(norm)) keyMap.set(norm, key); // guarda la primera aparición
+        if (!countMap.has(norm)) countMap.set(norm, 0);
         if (isNumericValue(row[key])) {
-          map.set(key, map.get(key) + 1);
+          countMap.set(norm, countMap.get(norm) + 1);
         }
       });
     });
 
-    return Array.from(map.entries())
+    return Array.from(countMap.entries())
       .filter(([, score]) => score > 0)
       .sort((a, b) => b[1] - a[1])
-      .map(([key]) => key);
+      .map(([norm]) => keyMap.get(norm));
   }, [rows]);
 
   useEffect(() => {
