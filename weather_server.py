@@ -115,9 +115,21 @@ def build_query(desde=None, hasta=None, device=None, limit=None):
 def flatten_rows(rows):
     result = []
     for r in rows:
-        row     = dict(r)
+        row = dict(r)
         payload = json.loads(row.get("raw_json") or "{}")
-        result.append({"id": row["id"], "received_at": row["received_at"], **payload})
+        # Normalizar claves a lower-case y eliminar duplicados case-insensitive
+        normalized = {}
+        for k, v in payload.items():
+            key_norm = k.lower() if isinstance(k, str) else k
+            if key_norm not in normalized:
+                normalized[key_norm] = v
+        # id y received_at se mantienen con su nombre original
+        normalized_result = {"id": row["id"], "received_at": row["received_at"]}
+        # Evitar colisión con id y received_at
+        for k, v in normalized.items():
+            if k not in normalized_result:
+                normalized_result[k] = v
+        result.append(normalized_result)
     return result
 
 
