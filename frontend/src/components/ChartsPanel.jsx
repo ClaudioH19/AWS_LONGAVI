@@ -31,7 +31,7 @@ function isNumericValue(value) {
 }
 
 function scaleValue(value) {
-  return Number((value / 10).toFixed(2));
+  return Number((value / 10).toFixed(1));
 }
 
 function getUnitForKey(key = '') {
@@ -266,7 +266,10 @@ export default function ChartsPanel() {
               size: 11,
               weight: '600',
             },
-            callback: (value) => (unit ? `${value} ${unit}` : `${value}`),
+            callback: (value) => {
+              const display = typeof value === 'number' ? value.toFixed(1) : String(value);
+              return unit ? `${display} ${unit}` : `${display}`;
+            },
           },
         },
       },
@@ -293,7 +296,8 @@ export default function ChartsPanel() {
             label: (context) => {
               const label = context.dataset?.label || selectedKey || 'Valor';
               const value = context.parsed?.y;
-              return unit ? `${label}: ${value} ${unit}` : `${label}: ${value}`;
+              const display = value === null || value === undefined ? '' : Number(value).toFixed(1);
+              return unit ? `${label}: ${display} ${unit}` : `${label}: ${display}`;
             },
           },
         },

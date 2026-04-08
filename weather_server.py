@@ -157,10 +157,21 @@ def frontend_files(path):
 @app.route("/weather", methods=["POST"])
 def receive_weather():
     try:
-        raw = request.get_json(force=True)
+        # Registrar cuerpo bruto para inspección del payload entrante
+        raw_text = request.get_data(as_text=True)
+        logger.info(f"Payload raw: {raw_text}")
+
+        raw = None
+        if raw_text:
+            try:
+                raw = json.loads(raw_text)
+            except Exception as e:
+                logger.warning(f"Error parsing JSON body: {e}")
+
         if not raw:
             logger.warning("Request sin JSON válido")
             return jsonify({"status": "error", "msg": "no json"}), 400
+
         logger.info(f"Recibido | device={raw.get('DeviceID','?')} ts={raw.get('Timestamp','?')}")
         save_reading(raw)
         return jsonify({"status": "ok"}), 200
