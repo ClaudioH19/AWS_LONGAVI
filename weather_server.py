@@ -13,6 +13,7 @@ import json
 import csv
 import io
 from datetime import datetime
+import threading
 
 app = Flask(__name__)
 
@@ -35,6 +36,10 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Último payload recibido (crudo) para debugging
+LAST_PAYLOAD_RAW = None
+LAST_PAYLOAD_LOCK = threading.Lock()
 
 
 # ============================================================
@@ -65,15 +70,23 @@ def init_db():
     logger.info("WAL mode activo")
 
 
-def save_reading(raw: dict):
-    # Renombrar key vacía (bug firmware BVMETEO, segundo valor del sensor temp+hum)
-    if "" in raw:
-        raw["Humidity"] = raw.pop("")
+def save_reading(raw: dict = None, raw_text: str = None):
+    """Guarda una lectura en la BD.
+    - Si `raw_text` se proporciona, se guarda tal cual (payload crudo).
+    - Si no, se serializa `raw` (aplicando la renombración de key vacía).
+    """
+    if raw_text is not None:
+        payload = raw_text
+    else:
+        # Renombrar key vacía (bug firmware BVMETEO, segundo valor del sensor temp+hum)
+        if raw and "" in raw:
+            raw["Humidity"] = raw.pop("")
+        payload = json.dumps(raw or {})
 
     conn = get_conn()
     conn.execute(
         "INSERT INTO weather_readings (received_at, raw_json) VALUES (?, ?)",
-        (datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), json.dumps(raw))
+        (datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), payload)
     )
     conn.commit()
     conn.close()
@@ -156,14 +169,16 @@ def frontend_files(path):
 
 @app.route("/weather", methods=["POST"])
 def receive_weather():
-    # MODO DEBUG: este endpoint solo recibe y devuelve el payload tal cual.
-    # El comportamiento previo (parsear, validar y persistir) queda comentado
-    # abajo por si se desea restaurarlo más tarde.
-    """
+
     try:
         # Registrar cuerpo bruto para inspección del payload entrante
         raw_text = request.get_data(as_text=True)
         logger.info(f"Payload raw: {raw_text}")
+
+        # Guardar último payload crudo en memoria para endpoint de debug
+        global LAST_PAYLOAD_RAW
+        with LAST_PAYLOAD_LOCK:
+            LAST_PAYLOAD_RAW = raw_text
 
         raw = None
         if raw_text:
@@ -172,30 +187,56 @@ def receive_weather():
             except Exception as e:
                 logger.warning(f"Error parsing JSON body: {e}")
 
-        if not raw:
-            logger.warning("Request sin JSON válido")
-            return jsonify({"status": "error", "msg": "no json"}), 400
+        # Guardar SIEMPRE el payload crudo en la BD (raw_text). Además se
+        # conserva la variable `raw` si el JSON pudo parsearse.
+        save_reading(raw=raw, raw_text=raw_text)
 
-        logger.info(f"Recibido | device={raw.get('DeviceID','?')} ts={raw.get('Timestamp','?')}")
-        save_reading(raw)
+        if raw:
+            logger.info(f"Recibido | device={raw.get('DeviceID','?')} ts={raw.get('Timestamp','?')}")
+        else:
+            logger.info("Recibido | payload no JSON o no parseable")
+
         return jsonify({"status": "ok"}), 200
     except Exception as e:
         logger.error(f"Error: {e}")
         return jsonify({"status": "error", "msg": str(e)}), 500
+    
+@app.route("/weather/raw", methods=["GET"])
+def get_last_raw():
+    """Devuelve el último payload crudo recibido (debug).
+    Si es JSON válido se devuelve como JSON, si no como texto plano.
     """
+    with LAST_PAYLOAD_LOCK:
+        s = LAST_PAYLOAD_RAW
 
-    # Nuevo comportamiento: devolver el cuerpo recibido tal cual.
-    raw_text = request.get_data(as_text=True)
-    logger.info(f"Payload raw (echo): {raw_text}")
-
-    if raw_text:
-        try:
-            parsed = json.loads(raw_text)
-            return Response(json.dumps(parsed, ensure_ascii=False), mimetype="application/json")
-        except Exception:
-            return Response(raw_text, mimetype="text/plain")
-    else:
+    if not s:
         return Response("", status=204, mimetype="text/plain")
+
+    try:
+        parsed = json.loads(s)
+        return Response(json.dumps(parsed, ensure_ascii=False), mimetype="application/json")
+    except Exception:
+        return Response(s, mimetype="text/plain")
+
+
+@app.route("/weather/raw/db", methods=["GET"])
+def get_last_raw_db():
+    """Devuelve el último `raw_json` almacenado en la BD (debug).
+    Si es JSON válido se devuelve como JSON, si no como texto plano.
+    """
+    conn = get_conn()
+    row = conn.execute("SELECT raw_json FROM weather_readings ORDER BY id DESC LIMIT 1").fetchone()
+    conn.close()
+
+    if not row:
+        return Response("", status=204, mimetype="text/plain")
+
+    raw_json = row["raw_json"] if isinstance(row, dict) or hasattr(row, '__getitem__') else row[0]
+    try:
+        parsed = json.loads(raw_json)
+        return Response(json.dumps(parsed, ensure_ascii=False), mimetype="application/json")
+    except Exception:
+        return Response(raw_json, mimetype="text/plain")
 
 
 # ============================================================
