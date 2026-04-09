@@ -156,6 +156,10 @@ def frontend_files(path):
 
 @app.route("/weather", methods=["POST"])
 def receive_weather():
+    # MODO DEBUG: este endpoint solo recibe y devuelve el payload tal cual.
+    # El comportamiento previo (parsear, validar y persistir) queda comentado
+    # abajo por si se desea restaurarlo más tarde.
+    """
     try:
         # Registrar cuerpo bruto para inspección del payload entrante
         raw_text = request.get_data(as_text=True)
@@ -178,6 +182,20 @@ def receive_weather():
     except Exception as e:
         logger.error(f"Error: {e}")
         return jsonify({"status": "error", "msg": str(e)}), 500
+    """
+
+    # Nuevo comportamiento: devolver el cuerpo recibido tal cual.
+    raw_text = request.get_data(as_text=True)
+    logger.info(f"Payload raw (echo): {raw_text}")
+
+    if raw_text:
+        try:
+            parsed = json.loads(raw_text)
+            return Response(json.dumps(parsed, ensure_ascii=False), mimetype="application/json")
+        except Exception:
+            return Response(raw_text, mimetype="text/plain")
+    else:
+        return Response("", status=204, mimetype="text/plain")
 
 
 # ============================================================
