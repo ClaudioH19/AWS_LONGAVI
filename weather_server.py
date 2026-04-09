@@ -41,6 +41,71 @@ logger = logging.getLogger(__name__)
 LAST_PAYLOAD_RAW = None
 LAST_PAYLOAD_LOCK = threading.Lock()
 
+# Payload mapping cargada desde payload.js (frontend)
+PAYLOAD_MAP = {}
+
+
+def _extract_js_object(text, start_idx=0):
+    """Extrae el primer objeto JS {...} comenzando en start_idx y devuelve el string del objeto.
+    Maneja balanceo de llaves de forma simple.
+    """
+    i = text.find('{', start_idx)
+    if i == -1:
+        return None
+    depth = 0
+    for j in range(i, len(text)):
+        if text[j] == '{':
+            depth += 1
+        elif text[j] == '}':
+            depth -= 1
+            if depth == 0:
+                return text[i:j+1]
+    return None
+
+
+def load_payload_map():
+    """Intenta cargar el mapping desde payload.js (workspace root)."""
+    global PAYLOAD_MAP
+    possible_paths = [
+        os.path.join(BASE_DIR, 'payload.js'),
+        os.path.join(BASE_DIR, 'frontend', 'payload.js'),
+        os.path.join(BASE_DIR, 'frontend', 'src', 'payload.js'),
+    ]
+    for p in possible_paths:
+        try:
+            if not os.path.isfile(p):
+                continue
+            with open(p, 'r', encoding='utf-8') as f:
+                txt = f.read()
+            # localizar const payload = { ... }
+            idx = txt.find('const payload')
+            if idx == -1:
+                idx = 0
+            obj_text = _extract_js_object(txt, idx)
+            if not obj_text:
+                continue
+            # obj_text debería ser JSON válido (usa comillas dobles en el repo actual)
+            try:
+                PAYLOAD_MAP = json.loads(obj_text)
+                logger.info(f'Payload map cargado desde {p}: {list(PAYLOAD_MAP.keys())}')
+                return
+            except Exception as e:
+                # intentar reemplazar comillas simples por dobles como fallback
+                try_text = obj_text.replace("'", '"')
+                try:
+                    PAYLOAD_MAP = json.loads(try_text)
+                    logger.info(f'Payload map cargado (fallback) desde {p}')
+                    return
+                except Exception:
+                    logger.warning(f'No pude parsear objeto JS en {p}: {e}')
+        except Exception:
+            continue
+    logger.info('No se encontró payload.js, usando mapping vacío')
+
+
+# Cargar mapping al inicio
+load_payload_map()
+
 
 # ============================================================
 # DB
@@ -58,12 +123,22 @@ def init_db():
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS weather_readings (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            received_at TEXT NOT NULL,
-            raw_json    TEXT NOT NULL
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            received_at     TEXT NOT NULL,
+            raw_json        TEXT NOT NULL,
+            normalized_json TEXT
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_received ON weather_readings(received_at)")
+    # Si la tabla existía sin la columna normalized_json, añadirla
+    cols = [c[1] for c in conn.execute("PRAGMA table_info(weather_readings)").fetchall()]
+    if 'normalized_json' not in cols:
+        try:
+            conn.execute("ALTER TABLE weather_readings ADD COLUMN normalized_json TEXT")
+            logger.info('Añadida columna normalized_json a weather_readings')
+        except Exception as e:
+            logger.warning(f'Error añadiendo columna normalized_json: {e}')
+
     conn.commit()
     conn.close()
     logger.info(f"DB lista: {os.path.abspath(DB_PATH)}")
@@ -75,18 +150,32 @@ def save_reading(raw: dict = None, raw_text: str = None):
     - Si `raw_text` se proporciona, se guarda tal cual (payload crudo).
     - Si no, se serializa `raw` (aplicando la renombración de key vacía).
     """
+    # Guardar raw_text tal cual en raw_json y una versión normalizada en normalized_json
     if raw_text is not None:
-        payload = raw_text
+        raw_payload_text = raw_text
     else:
-        # Renombrar key vacía (bug firmware BVMETEO, segundo valor del sensor temp+hum)
-        if raw and "" in raw:
-            raw["Humidity"] = raw.pop("")
-        payload = json.dumps(raw or {})
+        raw_payload_text = json.dumps(raw or {})
+
+    normalized_json = None
+    try:
+        if raw and isinstance(raw, dict):
+            # si hay key vacía y el mapping tiene una etiqueta para "", renombrarla
+            if "" in raw and "" in PAYLOAD_MAP:
+                label = PAYLOAD_MAP.get("")
+                raw[label] = raw.pop("")
+
+            normalized = {}
+            for k, v in raw.items():
+                label = PAYLOAD_MAP.get(k, k)
+                normalized[label] = v
+            normalized_json = json.dumps(normalized, ensure_ascii=False)
+    except Exception as e:
+        logger.warning(f'Error generando normalized_json: {e}')
 
     conn = get_conn()
     conn.execute(
-        "INSERT INTO weather_readings (received_at, raw_json) VALUES (?, ?)",
-        (datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), payload)
+        "INSERT INTO weather_readings (received_at, raw_json, normalized_json) VALUES (?, ?, ?)",
+        (datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), raw_payload_text, normalized_json)
     )
     conn.commit()
     conn.close()
@@ -116,7 +205,7 @@ def build_query(desde=None, hasta=None, device=None, limit=None):
         conditions.append("json_extract(raw_json, '$.DeviceID') = ?")
         params.append(device)
 
-    q = "SELECT id, received_at, raw_json FROM weather_readings"
+    q = "SELECT id, received_at, raw_json, normalized_json FROM weather_readings"
     if conditions:
         q += " WHERE " + " AND ".join(conditions)
     q += " ORDER BY received_at DESC"
@@ -129,19 +218,40 @@ def flatten_rows(rows):
     result = []
     for r in rows:
         row = dict(r)
-        payload = json.loads(row.get("raw_json") or "{}")
-        # Normalizar claves a lower-case y eliminar duplicados case-insensitive
-        normalized = {}
+        payload = {}
+        # Preferir la versión normalizada si existe en la BD
+        if row.get('normalized_json'):
+            try:
+                payload = json.loads(row.get('normalized_json') or "{}")
+            except Exception:
+                payload = {}
+        else:
+            try:
+                raw_payload = json.loads(row.get('raw_json') or "{}")
+            except Exception:
+                raw_payload = {}
+            # Mapear keys usando PAYLOAD_MAP (si existe)
+            payload = {}
+            for k, v in raw_payload.items():
+                label = PAYLOAD_MAP.get(k, k)
+                payload[label] = v
+
+        # Normalizar claves a lower-case para evitar duplicados case-insensitive,
+        # pero mantener la etiqueta original (casing) para mostrar en frontend
+        normalized_map = {}
         for k, v in payload.items():
-            key_norm = k.lower() if isinstance(k, str) else k
-            if key_norm not in normalized:
-                normalized[key_norm] = v
+            if isinstance(k, str):
+                key_norm = k.lower()
+            else:
+                key_norm = k
+            if key_norm not in normalized_map:
+                normalized_map[key_norm] = (k, v)
+
         # id y received_at se mantienen con su nombre original
         normalized_result = {"id": row["id"], "received_at": row["received_at"]}
-        # Evitar colisión con id y received_at
-        for k, v in normalized.items():
-            if k not in normalized_result:
-                normalized_result[k] = v
+        for key_norm, (label, value) in normalized_map.items():
+            if label not in normalized_result:
+                normalized_result[label] = value
         result.append(normalized_result)
     return result
 
@@ -247,7 +357,7 @@ def get_last_raw_db():
 def get_latest():
     conn = get_conn()
     row  = conn.execute(
-        "SELECT id, received_at, raw_json FROM weather_readings ORDER BY id DESC LIMIT 1"
+        "SELECT id, received_at, raw_json, normalized_json FROM weather_readings ORDER BY id DESC LIMIT 1"
     ).fetchone()
     conn.close()
     if not row:

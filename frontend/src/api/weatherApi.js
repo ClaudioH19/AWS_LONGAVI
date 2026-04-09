@@ -20,21 +20,9 @@ function buildRangeQuery({ desde, hasta, limit }) {
 }
 
 function normalizeWeatherRow(row = {}) {
-  const normalized = { ...row };
-
-  Object.entries(row).forEach(([key, value]) => {
-    const alias = FIELD_ALIASES[key];
-    if (alias) {
-      normalized[alias] = value;
-    }
-
-    if (/^ch\d+$/i.test(key)) {
-      normalized[key.toLowerCase()] = value;
-      normalized[key.toUpperCase()] = value;
-    }
-  });
-
-  return normalized;
+  // El servidor ya devuelve las claves mapeadas según payload.js.
+  // No crear claves adicionales (como ch0/CH0) aquí para evitar columnas "variables".
+  return { ...row };
 }
 
 function normalizeRows(rows = []) {
