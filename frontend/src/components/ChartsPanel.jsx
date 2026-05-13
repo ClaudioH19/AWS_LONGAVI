@@ -11,6 +11,13 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { fetchWeatherRange } from '../api/weatherApi';
+import { formatDateTimeShort, getTodayInChileDateInput } from '../utils/dateTime';
+import {
+  getVariableDisplayName,
+  getUnitForKey,
+  WEATHER_NUMERIC_EXCLUDED_KEYS,
+  WEATHER_PREFERRED_KEYS,
+} from '../utils/weatherVariables';
 
 ChartJS.register(
   CategoryScale,
@@ -22,44 +29,12 @@ ChartJS.register(
   Legend,
 );
 
-function getToday() {
-  return new Date().toISOString().split('T')[0];
-}
-
 function isNumericValue(value) {
   return value !== null && value !== '' && !Number.isNaN(Number(value));
 }
 
 function scaleValue(value) {
   return Number((value / 10).toFixed(1));
-}
-
-function getUnitForKey(key = '') {
-  const normalized = key.toLowerCase();
-
-  if (/temp|temperature|temperatura/.test(normalized)) return '°C';
-  if (/humidity|humedad|rh|hr/.test(normalized)) return '%';
-  if (/solar|radiaci|irradiance|radiation/.test(normalized)) return 'W/m2';
-  if (/press|presion|pressure/.test(normalized)) return 'hPa';
-  if (/wind|viento/.test(normalized)) return 'm/s';
-  if (/rain|lluvia|precip/.test(normalized)) return 'mm';
-
-  return '';
-}
-
-function formatDateTimeLabel(rawValue) {
-  if (!rawValue) return '';
-
-  const source = String(rawValue).trim();
-  const normalized = source.includes('T') ? source : source.replace(' ', 'T');
-  const date = new Date(normalized);
-
-  if (Number.isNaN(date.getTime())) {
-    return source.replace('T', ' ');
-  }
-
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function toSeries(rows, key) {
@@ -69,10 +44,10 @@ function toSeries(rows, key) {
     .map((row) => (isNumericValue(row[key]) ? scaleValue(Number(row[key])) : null));
 }
 
-export default function ChartsPanel() {
+export default function ChartsPanel({ refreshTick = 0 }) {
   const [filters, setFilters] = useState({
     desde: '',
-    hasta: getToday(),
+    hasta: getTodayInChileDateInput(),
     limit: 200,
   });
   const [rows, setRows] = useState([]);
@@ -81,37 +56,23 @@ export default function ChartsPanel() {
   const [selectedKey, setSelectedKey] = useState('');
 
   const labels = useMemo(
-    () => rows.slice().reverse().map((row) => formatDateTimeLabel(row.received_at || row.Timestamp || '')),
+    () => rows.slice().reverse().map((row) => formatDateTimeShort(row.received_at || row.Timestamp || '')),
     [rows],
   );
 
   const numericKeys = useMemo(() => {
     if (!rows.length) return [];
-    const excluded = new Set([
-      'id',
-      'received_at',
-      'raw_json',
-      'Timestamp',
-      'DeviceID',
-      'DeviceType',
-      'DeviceVersion',
-      'deviceid',
-      'devicetype',
-      'deviceversion',
-    ]);
-    // Normalización: minúsculas, sin espacios ni guiones bajos
-    const normalize = (k) => String(k).toLowerCase().replace(/\s|_/g, '');
-    const keyMap = new Map(); // normalizedKey -> originalKey
-    const countMap = new Map(); // normalizedKey -> count
+
+    const keyMap = new Map();
+    const countMap = new Map();
 
     rows.forEach((row) => {
       Object.keys(row).forEach((key) => {
-        if (excluded.has(key)) return;
-        const norm = normalize(key);
-        if (!keyMap.has(norm)) keyMap.set(norm, key); // guarda la primera aparición
-        if (!countMap.has(norm)) countMap.set(norm, 0);
+        if (WEATHER_NUMERIC_EXCLUDED_KEYS.has(key)) return;
+        if (!keyMap.has(key)) keyMap.set(key, key);
+        if (!countMap.has(key)) countMap.set(key, 0);
         if (isNumericValue(row[key])) {
-          countMap.set(norm, countMap.get(norm) + 1);
+          countMap.set(key, countMap.get(key) + 1);
         }
       });
     });
@@ -119,7 +80,7 @@ export default function ChartsPanel() {
     return Array.from(countMap.entries())
       .filter(([, score]) => score > 0)
       .sort((a, b) => b[1] - a[1])
-      .map(([norm]) => keyMap.get(norm));
+      .map(([key]) => keyMap.get(key));
   }, [rows]);
 
   useEffect(() => {
@@ -128,21 +89,7 @@ export default function ChartsPanel() {
       return;
     }
 
-    const preferred = [
-      'temperature',
-      'Temperature',
-      'Humidity',
-      'humidity',
-      'ch1',
-      'CH1',
-      'ch2',
-      'CH2',
-      'ch0',
-      'CH0',
-      'temperatura',
-      'humedad',
-    ];
-    const defaults = preferred.filter((key) => numericKeys.includes(key));
+    const defaults = WEATHER_PREFERRED_KEYS.filter((key) => numericKeys.includes(key));
     const fallback = numericKeys.slice(0, 1);
     const next = (defaults.length ? defaults : fallback).slice(0, 1);
 
@@ -158,8 +105,8 @@ export default function ChartsPanel() {
     try {
       const data = await fetchWeatherRange(filters);
       setRows(data);
-    } catch (e) {
-      setError('No se pudieron cargar datos para el gráfico.');
+    } catch {
+      setError('No se pudieron cargar datos para el grafico.');
       setRows([]);
     } finally {
       setLoading(false);
@@ -169,13 +116,15 @@ export default function ChartsPanel() {
   useEffect(() => {
     loadChart();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refreshTick]);
 
   const chartData = useMemo(() => {
     const selectedKeys = selectedKey ? [selectedKey] : [];
     const palette = ['#ff9800', '#2196f3', '#00e5a0', '#f06292', '#ffd54f', '#7e57c2'];
     const datasets = selectedKeys.map((key, index) => ({
-      label: getUnitForKey(key) ? `${key} (${getUnitForKey(key)})` : key,
+      label: getUnitForKey(key)
+        ? `${getVariableDisplayName(key)} (${getUnitForKey(key)})`
+        : getVariableDisplayName(key),
       data: toSeries(rows, key),
       borderColor: palette[index % palette.length],
       backgroundColor: `${palette[index % palette.length]}33`,
@@ -190,7 +139,8 @@ export default function ChartsPanel() {
 
   const chartOptions = useMemo(() => {
     const unit = getUnitForKey(selectedKey);
-    const yTitle = selectedKey ? (unit ? `${selectedKey} (${unit})` : selectedKey) : 'Valor';
+    const selectedLabel = getVariableDisplayName(selectedKey);
+    const yTitle = selectedKey ? (unit ? `${selectedLabel} (${unit})` : selectedLabel) : 'Valor';
 
     return {
       responsive: true,
@@ -238,7 +188,7 @@ export default function ChartsPanel() {
           },
           title: {
             display: true,
-            text: 'Fecha y hora',
+            text: 'Fecha y hora (Chile)',
             color: '#374151',
           },
         },
@@ -345,7 +295,9 @@ export default function ChartsPanel() {
             <option value="">Seleccionar variable</option>
             {numericKeys.map((key) => (
               <option key={`var-${key}`} value={key}>
-                {key}
+                {getUnitForKey(key)
+                  ? `${getVariableDisplayName(key)} (${getUnitForKey(key)})`
+                  : getVariableDisplayName(key)}
               </option>
             ))}
           </select>

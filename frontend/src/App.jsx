@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import ChartsPanel from './components/ChartsPanel';
 import DataTable from './components/DataTable';
 import { fetchHealth } from './api/weatherApi';
+import { formatDateTime } from './utils/dateTime';
 import './App.css';
 
 function App() {
@@ -10,7 +11,7 @@ function App() {
     ok: false,
     total: '-',
     ultimo: '-',
-    serverTime: '-',
+    serverTimeChile: '-',
   });
 
   useEffect(() => {
@@ -23,8 +24,8 @@ function App() {
         setHealth({
           ok: true,
           total: data.db_total_registros ?? '-',
-          ultimo: data.ultimo_registro ?? '-',
-          serverTime: data.server_time_utc?.split('.')?.[0] ?? '-',
+          ultimo: formatDateTime(data.ultimo_registro),
+          serverTimeChile: formatDateTime(data.server_time_chile || data.server_time_utc),
         });
       } catch {
         if (!active) return;
@@ -47,7 +48,7 @@ function App() {
   return (
     <div className="app-shell">
       <header className="top-nav">
-        <div className="brand">BIOVISION <span>Estación Meteorológica</span></div>
+        <div className="brand">BIOVISION <span>Estacion Meteorologica</span></div>
         <button type="button" className="cta-btn">Panel Operativo</button>
       </header>
 
@@ -68,18 +69,18 @@ function App() {
               <span className="stat-value">{health.total}</span>
             </div>
             <div className="stat">
-              <span className="stat-label">UTC</span>
-              <span className="stat-value">{health.serverTime}</span>
+              <span className="stat-label">Hora Chile</span>
+              <span className="stat-value">{health.serverTimeChile}</span>
             </div>
           </div>
-          <ChartsPanel />
+          <ChartsPanel refreshTick={refreshTick} />
           <DataTable refreshTick={refreshTick} />
         </main>
       </section>
 
       <footer className="site-footer">
         <span>BIOVISION Autopilot</span>
-        <span>Dashboard operativo de la estación meteorológica</span>
+        <span>Dashboard operativo de la estacion meteorologica</span>
       </footer>
     </div>
   );
