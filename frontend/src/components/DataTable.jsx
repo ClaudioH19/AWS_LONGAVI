@@ -30,11 +30,14 @@ export default function DataTable({ refreshTick = 0 }) {
   const orderedColumns = useMemo(() => {
     if (!rows.length) return [];
     const pinned = ['id', 'received_at', 'DeviceID', 'DeviceType', 'DeviceVersion', 'Timestamp'];
+    const fixedVariables = ['Hum', 'Temp', 'Precip', 'Rad', 'Vel', 'Dir'];
     const keys = new Set();
     rows.forEach((row) => Object.keys(row).forEach((key) => keys.add(key)));
     const all = Array.from(keys);
-    const rest = all.filter((key) => !pinned.includes(key));
-    return [...pinned.filter((key) => all.includes(key)), ...rest];
+    const presentPinned = pinned.filter((key) => all.includes(key));
+    const presentFixed = fixedVariables.filter((key) => all.includes(key));
+    const rest = all.filter((key) => !pinned.includes(key) && !fixedVariables.includes(key));
+    return [...presentPinned, ...presentFixed, ...rest];
   }, [rows]);
 
   async function loadTable() {

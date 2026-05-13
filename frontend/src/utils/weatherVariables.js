@@ -1,20 +1,20 @@
 const UNIT_RULES = [
   { pattern: /temp|temperature|temperatura|ch2/, unit: 'C' },
-  { pattern: /humidity|humedad|rh|hr|^$/, unit: '%' },
-  { pattern: /solar|radiaci|irradiance|radiation|ch4/, unit: 'W/m2' },
+  { pattern: /hum|humidity|humedad|rh|hr|^$/, unit: '%' },
+  { pattern: /rad|solar|radiaci|irradiance|radiation|ch4/, unit: 'W/m2' },
   { pattern: /press|presion|pressure/, unit: 'hPa' },
-  { pattern: /wind direction|direccion|ch1/, unit: 'deg' },
-  { pattern: /wind speed|viento|anemo|ch0/, unit: 'm/s' },
+  { pattern: /dir|wind direction|direccion|ch1/, unit: 'deg' },
+  { pattern: /vel|wind speed|viento|anemo|ch0/, unit: 'm/s' },
   { pattern: /rain|lluvia|precip|ch3/, unit: 'mm' },
 ];
 
 const DISPLAY_RULES = [
   { pattern: /temp|temperature|temperatura|ch2/, label: 'Temp' },
-  { pattern: /humidity|humedad|rh|hr|^$/, label: 'Hum' },
+  { pattern: /hum|humidity|humedad|rh|hr|^$/, label: 'Hum' },
   { pattern: /rain|lluvia|precip|ch3/, label: 'Precip' },
-  { pattern: /solar|radiaci|irradiance|radiation|ch4/, label: 'Rad' },
-  { pattern: /wind speed|viento|anemo|ch0/, label: 'Vel' },
-  { pattern: /wind direction|direccion|ch1/, label: 'Dir' },
+  { pattern: /rad|solar|radiaci|irradiance|radiation|ch4/, label: 'Rad' },
+  { pattern: /vel|wind speed|viento|anemo|ch0/, label: 'Vel' },
+  { pattern: /dir|wind direction|direccion|ch1/, label: 'Dir' },
 ];
 
 export const WEATHER_NUMERIC_EXCLUDED_KEYS = new Set([
@@ -27,6 +27,12 @@ export const WEATHER_NUMERIC_EXCLUDED_KEYS = new Set([
 ]);
 
 export const WEATHER_PREFERRED_KEYS = [
+  'Temp',
+  'Hum',
+  'Vel',
+  'Dir',
+  'Precip',
+  'Rad',
   'Temperature',
   'Humidity',
   'Wind Speed',

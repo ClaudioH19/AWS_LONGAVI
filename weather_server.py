@@ -47,6 +47,58 @@ TRAILING_COMMA_RE = re.compile(r",\s*([}\]])")
 JS_COMMENT_LINE_RE = re.compile(r"//.*?$", re.MULTILINE)
 JS_COMMENT_BLOCK_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
 
+FIXED_VARIABLE_ALIASES = {
+    "Hum": {
+        "",
+        "hum",
+        "humidity",
+        "humedad",
+        "rh",
+        "hr",
+    },
+    "Vel": {
+        "ch0",
+        "vel",
+        "windspeed",
+        "windvelocity",
+        "velocidad",
+        "viento",
+        "anemo",
+    },
+    "Dir": {
+        "ch1",
+        "dir",
+        "direccion",
+        "winddirection",
+    },
+    "Temp": {
+        "ch2",
+        "temp",
+        "temperature",
+        "temperatura",
+    },
+    "Precip": {
+        "ch3",
+        "precip",
+        "rain",
+        "rain24h",
+        "lluvia",
+        "precipitacion",
+        "precipitation",
+    },
+    "Rad": {
+        "ch4",
+        "rad",
+        "solar",
+        "solarradiation",
+        "radiation",
+        "radiacion",
+        "irradiance",
+    },
+}
+
+METADATA_KEYS = {"DeviceID", "DeviceType", "DeviceVersion", "Timestamp"}
+
 
 def _extract_js_object(text, start_idx=0):
     i = text.find("{", start_idx)
@@ -113,6 +165,25 @@ def is_channel_key(key):
     return bool(CHANNEL_KEY_RE.match(key or ""))
 
 
+def normalize_key_token(value):
+    if value is None:
+        return ""
+    text = str(value).strip().lower()
+    return re.sub(r"[^a-z0-9]+", "", text)
+
+
+def resolve_fixed_variable(*candidates):
+    for candidate in candidates:
+        token = normalize_key_token(candidate)
+        if token == "":
+            return "Hum"
+        for fixed_name, aliases in FIXED_VARIABLE_ALIASES.items():
+            alias_tokens = {normalize_key_token(alias) for alias in aliases}
+            if token in alias_tokens:
+                return fixed_name
+    return None
+
+
 def get_chile_now_text():
     return datetime.now(CHILE_TZ).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -130,15 +201,25 @@ def normalize_payload(raw_payload):
     normalized = {}
     for raw_key, value in raw_payload.items():
         key = "" if raw_key is None else str(raw_key)
-        if key in PAYLOAD_MAP:
-            label = str(PAYLOAD_MAP[key])
-        elif is_channel_key(key):
-            continue
-        else:
-            label = key
+        mapped_label = str(PAYLOAD_MAP.get(key, "")).strip()
 
-        if label not in normalized:
-            normalized[label] = value
+        fixed_variable = resolve_fixed_variable(key, mapped_label)
+        if fixed_variable:
+            if fixed_variable not in normalized:
+                normalized[fixed_variable] = value
+            continue
+
+        if key in METADATA_KEYS:
+            normalized[key] = value
+            continue
+
+        if is_channel_key(key):
+            # Unmapped channels are intentionally ignored from normalized output.
+            continue
+
+        fallback_label = mapped_label or key
+        if fallback_label not in normalized:
+            normalized[fallback_label] = value
     return normalized
 
 
@@ -237,21 +318,25 @@ def flatten_rows(rows):
     result = []
     for row_data in rows:
         row = dict(row_data)
-        payload = {}
+        raw_payload = {}
+        normalized_payload = {}
 
-        if row.get("normalized_json"):
-            try:
-                payload = json.loads(row.get("normalized_json") or "{}")
-            except Exception:
-                payload = {}
-            # Re-normalize old rows that may still contain raw keys like "" or chN.
-            payload = normalize_payload(payload)
-        else:
-            try:
-                raw_payload = json.loads(row.get("raw_json") or "{}")
-            except Exception:
-                raw_payload = {}
-            payload = normalize_payload(raw_payload)
+        try:
+            raw_payload = json.loads(row.get("raw_json") or "{}")
+        except Exception:
+            raw_payload = {}
+
+        try:
+            normalized_payload = json.loads(row.get("normalized_json") or "{}")
+        except Exception:
+            normalized_payload = {}
+
+        # Canonical source is raw_json; normalized_json only complements missing fields.
+        payload = normalize_payload(raw_payload)
+        normalized_fallback = normalize_payload(normalized_payload)
+        for key, value in normalized_fallback.items():
+            if key not in payload or payload[key] in ("", None):
+                payload[key] = value
 
         normalized_result = {"id": row["id"], "received_at": row["received_at"]}
         for label, value in payload.items():
