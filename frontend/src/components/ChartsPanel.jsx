@@ -145,6 +145,8 @@ function toWeeklyAverageSeries(rows, key, selectedWeek) {
 
 export default function ChartsPanel({ refreshTick = 0 }) {
   const [filters, setFilters] = useState({
+    desde: '',
+    hasta: getTodayInChileDateInput(),
     week: getCurrentWeekInput(),
     limit: 200,
   });
@@ -160,15 +162,18 @@ export default function ChartsPanel({ refreshTick = 0 }) {
   );
 
   async function loadChart() {
-    const { desde, hasta } = getWeekBounds(filters.week);
+    const { desde: weekDesde, hasta: weekHasta } = getWeekBounds(filters.week);
+    const queryFilters = {
+      limit: filters.limit,
+      ...(chartType === 'bar'
+        ? { desde: weekDesde, hasta: weekHasta }
+        : { desde: filters.desde, hasta: filters.hasta }),
+    };
+
     setLoading(true);
     setError('');
     try {
-      const data = await fetchWeatherRange({
-        desde,
-        hasta,
-        limit: filters.limit,
-      });
+      const data = await fetchWeatherRange(queryFilters);
       setRows(data);
     } catch {
       setError('No se pudieron cargar datos para el grafico.');
@@ -182,6 +187,11 @@ export default function ChartsPanel({ refreshTick = 0 }) {
     loadChart();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTick]);
+
+  useEffect(() => {
+    loadChart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chartType]);
 
   const chartData = useMemo(() => {
     if (!selectedKey) return { labels: [], datasets: [] };
@@ -357,10 +367,23 @@ export default function ChartsPanel({ refreshTick = 0 }) {
     <section className="panel">
       <h2>Graficos por variable en el tiempo</h2>
       <div className="panel-toolbar">
-        <label>
-          Semana
-          <input type="week" name="week" value={filters.week} onChange={onFilterChange} />
-        </label>
+        {chartType === 'bar' ? (
+          <label>
+            Semana
+            <input type="week" name="week" value={filters.week} onChange={onFilterChange} />
+          </label>
+        ) : (
+          <>
+            <label>
+              Desde
+              <input type="date" name="desde" value={filters.desde} onChange={onFilterChange} />
+            </label>
+            <label>
+              Hasta
+              <input type="date" name="hasta" value={filters.hasta} onChange={onFilterChange} />
+            </label>
+          </>
+        )}
         <label>
           Limite
           <input
