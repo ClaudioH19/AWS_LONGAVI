@@ -15,9 +15,9 @@ import { formatDateTimeShort, getTodayInChileDateInput } from '../utils/dateTime
 import {
   getVariableDisplayName,
   getUnitForKey,
-  WEATHER_NUMERIC_EXCLUDED_KEYS,
-  WEATHER_PREFERRED_KEYS,
 } from '../utils/weatherVariables';
+
+const FIXED_VARIABLE_KEYS = ['Temp', 'Hum', 'Precip', 'Rad', 'Vel', 'Dir'];
 
 ChartJS.register(
   CategoryScale,
@@ -53,51 +53,12 @@ export default function ChartsPanel({ refreshTick = 0 }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [selectedKey, setSelectedKey] = useState('');
+  const [selectedKey, setSelectedKey] = useState('Temp');
 
   const labels = useMemo(
     () => rows.slice().reverse().map((row) => formatDateTimeShort(row.received_at || row.Timestamp || '')),
     [rows],
   );
-
-  const numericKeys = useMemo(() => {
-    if (!rows.length) return [];
-
-    const keyMap = new Map();
-    const countMap = new Map();
-
-    rows.forEach((row) => {
-      Object.keys(row).forEach((key) => {
-        if (WEATHER_NUMERIC_EXCLUDED_KEYS.has(key)) return;
-        if (!keyMap.has(key)) keyMap.set(key, key);
-        if (!countMap.has(key)) countMap.set(key, 0);
-        if (isNumericValue(row[key])) {
-          countMap.set(key, countMap.get(key) + 1);
-        }
-      });
-    });
-
-    return Array.from(countMap.entries())
-      .filter(([, score]) => score > 0)
-      .sort((a, b) => b[1] - a[1])
-      .map(([key]) => keyMap.get(key));
-  }, [rows]);
-
-  useEffect(() => {
-    if (!numericKeys.length) {
-      setSelectedKey('');
-      return;
-    }
-
-    const defaults = WEATHER_PREFERRED_KEYS.filter((key) => numericKeys.includes(key));
-    const fallback = numericKeys.slice(0, 1);
-    const next = (defaults.length ? defaults : fallback).slice(0, 1);
-
-    setSelectedKey((current) => {
-      if (current && numericKeys.includes(current)) return current;
-      return next[0] || '';
-    });
-  }, [numericKeys]);
 
   async function loadChart() {
     setLoading(true);
@@ -291,9 +252,9 @@ export default function ChartsPanel({ refreshTick = 0 }) {
         </label>
         <label className="variable-inline-selector">
           Variable
-          <select value={selectedKey} onChange={onVariableChange} disabled={numericKeys.length === 0}>
+          <select value={selectedKey} onChange={onVariableChange}>
             <option value="">Seleccionar variable</option>
-            {numericKeys.map((key) => (
+            {FIXED_VARIABLE_KEYS.map((key) => (
               <option key={`var-${key}`} value={key}>
                 {getUnitForKey(key)
                   ? `${getVariableDisplayName(key)} (${getUnitForKey(key)})`
