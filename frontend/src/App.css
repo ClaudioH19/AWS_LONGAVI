@@ -317,6 +317,35 @@ main {
   min-width: 190px;
 }
 
+.chart-type-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: #fff;
+}
+
+.chart-type-toggle button {
+  background: transparent;
+  border: 0;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.42rem 0.78rem;
+  border-radius: 0.55rem;
+}
+
+.chart-type-toggle button:hover {
+  background: #f4f7f5;
+}
+
+.chart-type-toggle button.is-active {
+  background: color-mix(in oklab, var(--brand) 12%, white);
+  color: var(--brand-strong);
+}
+
 .chart-wrap {
   min-height: 240px;
   overflow-x: auto;

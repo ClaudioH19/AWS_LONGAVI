@@ -13,8 +13,8 @@ const DISPLAY_RULES = [
   { pattern: /hum|humidity|humedad|rh|hr|^$/, label: 'Hum' },
   { pattern: /rain|lluvia|precip|ch3/, label: 'Precip' },
   { pattern: /rad|solar|radiaci|irradiance|radiation|ch4/, label: 'Rad' },
-  { pattern: /vel|wind speed|viento|anemo|ch0/, label: 'Vel' },
-  { pattern: /dir|wind direction|direccion|ch1/, label: 'Dir' },
+  { pattern: /vel|wind speed|viento|anemo|ch0/, label: 'Velocidad' },
+  { pattern: /dir|wind direction|direccion|ch1/, label: 'Dirección' },
 ];
 
 export const WEATHER_NUMERIC_EXCLUDED_KEYS = new Set([
