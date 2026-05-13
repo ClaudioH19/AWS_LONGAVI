@@ -67,7 +67,7 @@ export default function ChartsPanel({ refreshTick = 0 }) {
       const data = await fetchWeatherRange(filters);
       setRows(data);
     } catch {
-      setError('No se pudieron cargar datos para el grafico.');
+      setError('No se pudieron cargar datos para el gráfico.');
       setRows([]);
     } finally {
       setLoading(false);
@@ -229,7 +229,7 @@ export default function ChartsPanel({ refreshTick = 0 }) {
 
   return (
     <section className="panel">
-      <h2>Graficos por variable en el tiempo</h2>
+      <h2>Gráficos por variable en el tiempo</h2>
       <div className="panel-toolbar">
         <label>
           Desde
@@ -240,7 +240,7 @@ export default function ChartsPanel({ refreshTick = 0 }) {
           <input type="date" name="hasta" value={filters.hasta} onChange={onFilterChange} />
         </label>
         <label>
-          Limite
+          Límite
           <input
             type="number"
             min="1"
@@ -264,13 +264,13 @@ export default function ChartsPanel({ refreshTick = 0 }) {
           </select>
         </label>
         <button type="button" onClick={loadChart} disabled={loading}>
-          {loading ? 'Cargando...' : 'Actualizar grafico'}
+          {loading ? 'Cargando...' : 'Actualizar gráfico'}
         </button>
       </div>
 
       <div className="chart-wrap">
         {error && <p className="error">{error}</p>}
-        {loading && !error && <p className="muted">Actualizando grafico...</p>}
+        {loading && !error && <p className="muted">Actualizando gráfico...</p>}
         {!error && selectedKeys.length > 0 && (
           <div className="chart-canvas-shell">
             <Line data={chartData} options={chartOptions} />

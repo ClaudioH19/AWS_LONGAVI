@@ -48,7 +48,7 @@ function App() {
   return (
     <div className="app-shell">
       <header className="top-nav">
-        <div className="brand">BIOVISION <span>Estacion Meteorologica</span></div>
+        <div className="brand">BIOVISION <span>Estación Meteorológica</span></div>
         <button type="button" className="cta-btn">Panel Operativo</button>
       </header>
 
@@ -61,7 +61,7 @@ function App() {
               <span className="stat-value">{health.ok ? 'OK' : 'ERROR'}</span>
             </div>
             <div className="stat">
-              <span className="stat-label">Ultimo dato</span>
+              <span className="stat-label">Último dato</span>
               <span className="stat-value">{health.ultimo}</span>
             </div>
             <div className="stat">
@@ -80,7 +80,7 @@ function App() {
 
       <footer className="site-footer">
         <span>BIOVISION Autopilot</span>
-        <span>Dashboard operativo de la estacion meteorologica</span>
+        <span>Dashboard operativo de la estación meteorológica</span>
       </footer>
     </div>
   );

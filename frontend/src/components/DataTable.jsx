@@ -13,7 +13,7 @@ function getColumnLabel(column) {
   if (column === 'Timestamp') return 'Timestamp';
   if (column === 'DeviceID') return 'Dispositivo';
   if (column === 'DeviceType') return 'Tipo';
-  if (column === 'DeviceVersion') return 'Version';
+  if (column === 'DeviceVersion') return 'Versión';
   return getVariableDisplayName(column);
 }
 
@@ -86,7 +86,7 @@ export default function DataTable({ refreshTick = 0 }) {
           <input type="date" name="hasta" value={filters.hasta} onChange={onFilterChange} />
         </label>
         <label>
-          Limite
+          Límite
           <input
             type="number"
             min="1"
@@ -105,7 +105,7 @@ export default function DataTable({ refreshTick = 0 }) {
       {error && <p className="error">{error}</p>}
 
       {!error && rows.length === 0 && !loading && (
-        <p className="muted">Sin datos para el periodo seleccionado.</p>
+        <p className="muted">Sin datos para el período seleccionado.</p>
       )}
 
       {!error && rows.length > 0 && (
