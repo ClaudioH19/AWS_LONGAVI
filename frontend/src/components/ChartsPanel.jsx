@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   BarElement,
+  BarController,
   CategoryScale,
   Chart as ChartJS,
   Legend,
   LineElement,
+  LineController,
   LinearScale,
   PointElement,
   Title,
@@ -23,6 +25,8 @@ import {
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 ChartJS.register(
+  BarController,
+  LineController,
   CategoryScale,
   LinearScale,
   PointElement,
