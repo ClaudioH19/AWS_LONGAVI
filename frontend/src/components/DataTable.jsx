@@ -17,7 +17,7 @@ function getColumnLabel(column) {
   if (column === 'Timestamp') return 'Timestamp';
   if (column === 'DeviceID') return 'Dispositivo';
   if (column === 'DeviceType') return 'Tipo';
-  if (column === 'DeviceVersion') return 'Version';
+  if (column === 'DeviceVersion') return 'Versión';
   return getVariableDisplayName(column);
 }
 
@@ -51,7 +51,7 @@ export default function DataTable({ refreshTick = 0 }) {
       const data = await fetchWeatherRange(filters);
       setRows(data);
     } catch {
-      setError('No se pudieron cargar los datos historicos.');
+      setError('No se pudieron cargar los datos históricos.');
       setRows([]);
     } finally {
       setLoading(false);
@@ -81,8 +81,8 @@ export default function DataTable({ refreshTick = 0 }) {
     <section className="panel">
       <div className="section-heading">
         <div>
-          <span className="panel-kicker">Historico</span>
-          <h2>Tabla persistida de la estacion</h2>
+          <span className="panel-kicker">Tabla</span>
+          <h2>Histórico de lecturas</h2>
         </div>
       </div>
 
@@ -96,7 +96,7 @@ export default function DataTable({ refreshTick = 0 }) {
           <input type="date" name="hasta" value={filters.hasta} onChange={onFilterChange} />
         </label>
         <label>
-          Limite
+          Límite
           <input
             type="number"
             min="1"
@@ -116,9 +116,7 @@ export default function DataTable({ refreshTick = 0 }) {
 
       {error && <p className="error">{error}</p>}
 
-      {!error && rows.length === 0 && !loading && (
-        <p className="muted">Sin datos para el periodo seleccionado.</p>
-      )}
+      {!error && rows.length === 0 && !loading && <p className="muted">Sin datos para el período seleccionado.</p>}
 
       {!error && rows.length > 0 && (
         <div className="table-wrap">

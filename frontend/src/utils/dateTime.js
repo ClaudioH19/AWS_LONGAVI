@@ -35,3 +35,34 @@ export function formatDateTimeShort(value, fallback = '') {
   const [, , month, day, hour, minute] = match;
   return `${day}/${month} ${hour}:${minute}`;
 }
+
+export function parseDateTimeParts(value) {
+  if (!value) return null;
+  const text = String(value).trim();
+  const match = text.match(DATE_TIME_REGEX);
+  if (!match) return null;
+
+  const [, year, month, day, hour, minute, second = '00'] = match;
+  return {
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
+    hour: Number(hour),
+    minute: Number(minute),
+    second: Number(second),
+  };
+}
+
+export function parseDateTimeAsLocal(value) {
+  const parts = parseDateTimeParts(value);
+  if (!parts) return null;
+
+  return new Date(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+  );
+}

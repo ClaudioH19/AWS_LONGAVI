@@ -1,20 +1,42 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ChartsPanel from './components/ChartsPanel';
 import DataTable from './components/DataTable';
 import OverviewPanel from './components/OverviewPanel';
 import { fetchHealth, fetchLatest } from './api/weatherApi';
-import { formatDateTime } from './utils/dateTime';
+import { formatDateTime, parseDateTimeAsLocal } from './utils/dateTime';
 import './App.css';
+
+function getStatusModel({ healthOk, latestTimestamp, serverTimestamp }) {
+  if (!healthOk) {
+    return { label: 'Con problemas', toneClass: 'is-error' };
+  }
+
+  if (!latestTimestamp || !serverTimestamp) {
+    return { label: 'Con interrupciones', toneClass: 'is-warning' };
+  }
+
+  const latestDate = parseDateTimeAsLocal(latestTimestamp);
+  const serverDate = parseDateTimeAsLocal(serverTimestamp);
+  if (!latestDate || !serverDate) {
+    return { label: 'Con interrupciones', toneClass: 'is-warning' };
+  }
+
+  const hoursWithoutData = (serverDate.getTime() - latestDate.getTime()) / (1000 * 60 * 60);
+  if (hoursWithoutData > 3) {
+    return { label: 'Con interrupciones', toneClass: 'is-warning' };
+  }
+
+  return { label: 'Online', toneClass: 'is-ok' };
+}
 
 function App() {
   const [refreshTick, setRefreshTick] = useState(0);
+  const [activeView, setActiveView] = useState('charts');
   const [health, setHealth] = useState({
     ok: false,
     total: '-',
     ultimo: '',
     serverTimeChile: '',
-    dbPath: '',
-    dbSizeBytes: 0,
   });
   const [latest, setLatest] = useState(null);
 
@@ -38,8 +60,6 @@ function App() {
           total: data.db_total_registros ?? '-',
           ultimo: data.ultimo_registro || '',
           serverTimeChile: data.server_time_chile || data.server_time_utc || '',
-          dbPath: data.db_path || '',
-          dbSizeBytes: data.db_size_bytes ?? 0,
         });
       } else {
         setHealth((prev) => ({ ...prev, ok: false }));
@@ -64,32 +84,57 @@ function App() {
     };
   }, []);
 
+  const latestTimestamp = latest?.received_at || latest?.Timestamp || health.ultimo;
+  const status = useMemo(
+    () => getStatusModel({
+      healthOk: health.ok,
+      latestTimestamp,
+      serverTimestamp: health.serverTimeChile,
+    }),
+    [health.ok, health.serverTimeChile, latestTimestamp],
+  );
+
   return (
     <div className="app-shell">
       <header className="top-nav">
         <div className="brand">
           BIOVISION
-          <span>Panel de estacion meteorologica</span>
+          <span>Panel de estación meteorológica</span>
         </div>
         <div className="nav-status">
-          <span className={`status-pill ${health.ok ? 'is-ok' : 'is-error'}`}>
-            {health.ok ? 'Online' : 'Offline'}
-          </span>
+          <span className={`status-pill ${status.toneClass}`}>{status.label}</span>
           <span className="nav-time">{formatDateTime(health.serverTimeChile)}</span>
         </div>
       </header>
 
       <section id="panel" className="dashboard-section">
         <main>
-          <OverviewPanel health={health} latest={latest} />
-          <ChartsPanel refreshTick={refreshTick} />
-          <DataTable refreshTick={refreshTick} />
+          <OverviewPanel latest={latest} status={status} />
+
+          <nav className="panel-nav" aria-label="Cambiar vista">
+            <button
+              type="button"
+              className={activeView === 'charts' ? 'is-active' : ''}
+              onClick={() => setActiveView('charts')}
+            >
+              Gráficos
+            </button>
+            <button
+              type="button"
+              className={activeView === 'table' ? 'is-active' : ''}
+              onClick={() => setActiveView('table')}
+            >
+              Tabla de datos
+            </button>
+          </nav>
+
+          {activeView === 'charts' ? (
+            <ChartsPanel refreshTick={refreshTick} />
+          ) : (
+            <DataTable refreshTick={refreshTick} />
+          )}
         </main>
       </section>
-
-      <footer className="site-footer">
-        <span>Historial persistente en SQLite y visualizacion operativa del estado actual.</span>
-      </footer>
     </div>
   );
 }
