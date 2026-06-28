@@ -9,12 +9,12 @@ const UNIT_RULES = [
 ];
 
 const DISPLAY_RULES = [
-  { pattern: /temp|temperature|temperatura|ch2/, label: 'Temp' },
-  { pattern: /hum|humidity|humedad|rh|hr|^$/, label: 'Hum' },
-  { pattern: /rain|lluvia|precip|ch3/, label: 'Precip' },
-  { pattern: /rad|solar|radiaci|irradiance|radiation|ch4/, label: 'Rad' },
+  { pattern: /temp|temperature|temperatura|ch2/, label: 'Temperatura' },
+  { pattern: /hum|humidity|humedad|rh|hr|^$/, label: 'Humedad' },
+  { pattern: /rain|lluvia|precip|ch3/, label: 'Precipitacion' },
+  { pattern: /rad|solar|radiaci|irradiance|radiation|ch4/, label: 'Radiacion solar' },
   { pattern: /vel|wind speed|viento|anemo|ch0/, label: 'Velocidad' },
-  { pattern: /dir|wind direction|direccion|ch1/, label: 'Dirección' },
+  { pattern: /dir|wind direction|direccion|ch1/, label: 'Direccion' },
 ];
 
 export const WEATHER_NUMERIC_EXCLUDED_KEYS = new Set([
@@ -47,6 +47,8 @@ export const WEATHER_PREFERRED_KEYS = [
   'ch4',
 ];
 
+export const WEATHER_FIXED_KEYS = ['Temp', 'Hum', 'Vel', 'Dir', 'Precip', 'Rad'];
+
 export function getUnitForKey(key = '') {
   const normalized = String(key).toLowerCase().trim();
   const match = UNIT_RULES.find((rule) => rule.pattern.test(normalized));
@@ -57,4 +59,29 @@ export function getVariableDisplayName(key = '') {
   const normalized = String(key).toLowerCase().trim();
   const match = DISPLAY_RULES.find((rule) => rule.pattern.test(normalized));
   return match ? match.label : key;
+}
+
+export function scaleWeatherValue(key = '', value) {
+  if (value === null || value === undefined || value === '') return null;
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return null;
+
+  if (getUnitForKey(key)) {
+    return Number((numericValue / 10).toFixed(2));
+  }
+
+  return numericValue;
+}
+
+export function formatWeatherValue(key = '', value, fallback = '--') {
+  const scaledValue = scaleWeatherValue(key, value);
+  if (scaledValue === null) return fallback;
+
+  const unit = getUnitForKey(key);
+  const formatted = scaledValue.toLocaleString('es-CL', {
+    minimumFractionDigits: scaledValue % 1 === 0 ? 0 : 1,
+    maximumFractionDigits: 2,
+  });
+
+  return unit ? `${formatted} ${unit}` : formatted;
 }

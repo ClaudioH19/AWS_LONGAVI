@@ -22,7 +22,7 @@ app = Flask(__name__)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIST_DIR = os.path.join(BASE_DIR, "frontend_dist")
 
-DB_PATH = os.environ.get("DB_PATH", "weather_data.db")
+DB_PATH = os.path.abspath(os.environ.get("DB_PATH", os.path.join(BASE_DIR, "weather_data.db")))
 PORT = int(os.environ.get("PORT", 3000))
 LOG_FILE = os.environ.get("LOG_FILE", "weather_server.log")
 
@@ -38,6 +38,8 @@ logger = logging.getLogger(__name__)
 
 LAST_PAYLOAD_RAW = None
 LAST_PAYLOAD_LOCK = threading.Lock()
+DB_INIT_LOCK = threading.Lock()
+DB_INITIALIZED = False
 
 PAYLOAD_MAP = {}
 CHILE_TZ = ZoneInfo("America/Santiago")
@@ -174,9 +176,14 @@ def normalize_key_token(value):
 
 def resolve_fixed_variable(*candidates):
     for candidate in candidates:
+        if candidate is None:
+            continue
+        candidate_text = str(candidate).strip()
         token = normalize_key_token(candidate)
         if token == "":
-            return "Hum"
+            if candidate_text == "":
+                return "Hum"
+            continue
         for fixed_name, aliases in FIXED_VARIABLE_ALIASES.items():
             alias_tokens = {normalize_key_token(alias) for alias in aliases}
             if token in alias_tokens:
@@ -203,7 +210,9 @@ def normalize_payload(raw_payload):
         key = "" if raw_key is None else str(raw_key)
         mapped_label = str(PAYLOAD_MAP.get(key, "")).strip()
 
-        fixed_variable = resolve_fixed_variable(key, mapped_label)
+        fixed_variable = resolve_fixed_variable(key)
+        if not fixed_variable and mapped_label:
+            fixed_variable = resolve_fixed_variable(mapped_label)
         if fixed_variable:
             if fixed_variable not in normalized:
                 normalized[fixed_variable] = value
@@ -227,38 +236,74 @@ load_payload_map()
 
 
 def get_conn():
+    ensure_db_ready()
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def init_db():
-    conn = get_conn()
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA synchronous=NORMAL")
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS weather_readings (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            received_at     TEXT NOT NULL,
-            raw_json        TEXT NOT NULL,
-            normalized_json TEXT
+    global DB_INITIALIZED
+    with DB_INIT_LOCK:
+        if DB_INITIALIZED:
+            return
+
+        conn = sqlite3.connect(DB_PATH, timeout=10)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS weather_readings (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                received_at     TEXT NOT NULL,
+                raw_json        TEXT NOT NULL,
+                normalized_json TEXT
+            )
+            """
         )
-        """
-    )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_received ON weather_readings(received_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_received ON weather_readings(received_at)")
 
-    cols = [c[1] for c in conn.execute("PRAGMA table_info(weather_readings)").fetchall()]
-    if "normalized_json" not in cols:
-        try:
-            conn.execute("ALTER TABLE weather_readings ADD COLUMN normalized_json TEXT")
-            logger.info("Added normalized_json column to weather_readings")
-        except Exception as error:
-            logger.warning("Could not add normalized_json column: %s", error)
+        cols = [c[1] for c in conn.execute("PRAGMA table_info(weather_readings)").fetchall()]
+        if "normalized_json" not in cols:
+            try:
+                conn.execute("ALTER TABLE weather_readings ADD COLUMN normalized_json TEXT")
+                logger.info("Added normalized_json column to weather_readings")
+            except Exception as error:
+                logger.warning("Could not add normalized_json column: %s", error)
 
-    conn.commit()
-    conn.close()
-    logger.info("DB ready: %s", os.path.abspath(DB_PATH))
+        conn.commit()
+        conn.close()
+        DB_INITIALIZED = True
+        logger.info("DB ready: %s", os.path.abspath(DB_PATH))
+
+
+def ensure_db_ready():
+    if DB_INITIALIZED:
+        return
+    init_db()
+
+
+def get_db_file_size():
+    try:
+        return os.path.getsize(DB_PATH)
+    except OSError:
+        return 0
+
+
+def get_db_directory():
+    return os.path.dirname(DB_PATH) or BASE_DIR
+
+
+def get_db_status():
+    return {
+        "db_path": DB_PATH,
+        "db_exists": os.path.exists(DB_PATH),
+        "db_directory": get_db_directory(),
+        "db_size_bytes": get_db_file_size(),
+        "db_storage": "sqlite",
+        "db_initialized": DB_INITIALIZED,
+    }
 
 
 def save_reading(raw=None, raw_text=None, received_at=None):
@@ -533,6 +578,7 @@ def health():
     total = conn.execute("SELECT COUNT(*) FROM weather_readings").fetchone()[0]
     last = conn.execute("SELECT MAX(received_at) FROM weather_readings").fetchone()[0]
     conn.close()
+    db_status = get_db_status()
     return jsonify(
         {
             "status": "ok",
@@ -540,12 +586,15 @@ def health():
             "server_time_chile": datetime.now(CHILE_TZ).isoformat(),
             "db_total_registros": total,
             "ultimo_registro": last,
+            **db_status,
         }
     ), 200
 
 
+init_db()
+
+
 if __name__ == "__main__":
-    init_db()
     logger.info("=" * 55)
     logger.info("Port: %s  DB: %s", PORT, DB_PATH)
     logger.info("Dashboard  -> GET  /")

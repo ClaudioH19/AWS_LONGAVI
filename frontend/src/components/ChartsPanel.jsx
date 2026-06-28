@@ -14,11 +14,12 @@ import { Bar, Line } from 'react-chartjs-2';
 import { fetchWeatherRange } from '../api/weatherApi';
 import { formatDateTimeShort, getTodayInChileDateInput } from '../utils/dateTime';
 import {
+  WEATHER_FIXED_KEYS,
   getVariableDisplayName,
   getUnitForKey,
+  scaleWeatherValue,
 } from '../utils/weatherVariables';
 
-const FIXED_VARIABLE_KEYS = ['Temp', 'Hum', 'Precip', 'Rad', 'Vel', 'Dir'];
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'];
 
 ChartJS.register(
@@ -32,23 +33,17 @@ ChartJS.register(
   Legend,
 );
 
-function isNumericValue(value) {
-  return value !== null && value !== '' && !Number.isNaN(Number(value));
-}
-
-function scaleValue(value) {
-  return Number((value / 10).toFixed(2));
-}
-
 function parseDateParts(value) {
   if (!value) return null;
   const text = String(value).trim();
   const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!match) return null;
+
   const year = Number(match[1]);
   const month = Number(match[2]);
   const day = Number(match[3]);
   if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+
   return { year, month, day };
 }
 
@@ -117,7 +112,7 @@ function toSeries(rows, key) {
   return rows
     .slice()
     .reverse()
-    .map((row) => (isNumericValue(row[key]) ? scaleValue(Number(row[key])) : null));
+    .map((row) => scaleWeatherValue(key, row[key]));
 }
 
 function toWeeklyAverageSeries(rows, key, selectedWeek) {
@@ -131,16 +126,109 @@ function toWeeklyAverageSeries(rows, key, selectedWeek) {
 
     const rowWeek = getIsoWeekKeyFromDateParts(dateParts.year, dateParts.month, dateParts.day);
     if (rowWeek !== selectedWeek) return;
-    if (!isNumericValue(row[key])) return;
+
+    const scaledValue = scaleWeatherValue(key, row[key]);
+    if (scaledValue === null) return;
 
     const weekdayIndex = getWeekdayIndex(timestamp);
     if (weekdayIndex === null) return;
 
-    totals[weekdayIndex] += Number(row[key]) / 10;
+    totals[weekdayIndex] += scaledValue;
     counts[weekdayIndex] += 1;
   });
 
   return totals.map((sum, index) => (counts[index] ? Number((sum / counts[index]).toFixed(2)) : null));
+}
+
+function buildChartOptions({ selectedKey, isBarChart }) {
+  const unit = getUnitForKey(selectedKey);
+  const selectedLabel = getVariableDisplayName(selectedKey);
+  const yTitle = unit ? `${selectedLabel} (${unit})` : selectedLabel;
+
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
+    elements: {
+      point: {
+        radius: isBarChart ? 2 : 0,
+        hoverRadius: 4,
+      },
+    },
+    scales: {
+      x: {
+        grid: {
+          color: 'rgba(148, 163, 184, 0.14)',
+        },
+        ticks: {
+          color: '#4c5a55',
+          maxRotation: 0,
+          autoSkip: !isBarChart,
+          maxTicksLimit: isBarChart ? undefined : 10,
+        },
+        title: {
+          display: true,
+          text: isBarChart ? 'Dia de semana' : 'Fecha y hora',
+          color: '#33403c',
+        },
+      },
+      y: {
+        grace: '8%',
+        grid: {
+          color: 'rgba(148, 163, 184, 0.16)',
+        },
+        ticks: {
+          color: '#4c5a55',
+          callback: (value) => (unit ? `${value} ${unit}` : `${value}`),
+        },
+        title: {
+          display: true,
+          text: yTitle,
+          color: '#33403c',
+        },
+      },
+    },
+    plugins: {
+      legend: {
+        labels: {
+          color: '#33403c',
+          font: {
+            weight: '700',
+          },
+        },
+      },
+      tooltip: {
+        backgroundColor: 'rgba(16, 24, 22, 0.94)',
+        titleColor: '#eef6f2',
+        bodyColor: '#eef6f2',
+        callbacks: {
+          label: (context) => {
+            const label = context.dataset?.label || selectedLabel;
+            const value = context.parsed?.y;
+            if (value === null || value === undefined) {
+              return `${label}: sin dato`;
+            }
+            return unit ? `${label}: ${value.toFixed(2)} ${unit}` : `${label}: ${value.toFixed(2)}`;
+          },
+        },
+      },
+    },
+  };
+}
+
+function ChartCard({ title, subtitle, children }) {
+  return (
+    <article className="chart-panel">
+      <div className="chart-header">
+        <h3>{title}</h3>
+        <p>{subtitle}</p>
+      </div>
+      <div className="chart-canvas-shell">{children}</div>
+    </article>
+  );
 }
 
 export default function ChartsPanel({ refreshTick = 0 }) {
@@ -148,242 +236,135 @@ export default function ChartsPanel({ refreshTick = 0 }) {
     desde: '',
     hasta: getTodayInChileDateInput(),
     week: getCurrentWeekInput(),
-    limit: 200,
+    limit: 240,
   });
-  const [rows, setRows] = useState([]);
+  const [lineRows, setLineRows] = useState([]);
+  const [barRows, setBarRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [selectedKey, setSelectedKey] = useState('Temp');
-  const [chartType, setChartType] = useState('line');
+  const [lineKey, setLineKey] = useState('Temp');
+  const [barKey, setBarKey] = useState('Hum');
 
   const lineLabels = useMemo(
-    () => rows.slice().reverse().map((row) => formatDateTimeShort(getTimestampForRow(row))),
-    [rows],
+    () => lineRows.slice().reverse().map((row) => formatDateTimeShort(getTimestampForRow(row))),
+    [lineRows],
   );
 
-  async function loadChart() {
+  async function loadCharts() {
     const { desde: weekDesde, hasta: weekHasta } = getWeekBounds(filters.week);
-    const queryFilters = {
-      limit: filters.limit,
-      ...(chartType === 'bar'
-        ? { desde: weekDesde, hasta: weekHasta }
-        : { desde: filters.desde, hasta: filters.hasta }),
-    };
 
     setLoading(true);
     setError('');
     try {
-      const data = await fetchWeatherRange(queryFilters);
-      setRows(data);
+      const [lineData, barData] = await Promise.all([
+        fetchWeatherRange({
+          desde: filters.desde,
+          hasta: filters.hasta,
+          limit: filters.limit,
+        }),
+        fetchWeatherRange({
+          desde: weekDesde,
+          hasta: weekHasta,
+          limit: filters.limit,
+        }),
+      ]);
+
+      setLineRows(lineData);
+      setBarRows(barData);
     } catch {
-      setError('No se pudieron cargar datos para el grafico.');
-      setRows([]);
+      setError('No se pudieron cargar los graficos.');
+      setLineRows([]);
+      setBarRows([]);
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadChart();
+    loadCharts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTick]);
 
-  useEffect(() => {
-    loadChart();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chartType]);
-
-  const chartData = useMemo(() => {
-    if (!selectedKey) return { labels: [], datasets: [] };
-
-    const color = '#ff9800';
-    const baseLabel = getUnitForKey(selectedKey)
-      ? `${getVariableDisplayName(selectedKey)} (${getUnitForKey(selectedKey)})`
-      : getVariableDisplayName(selectedKey);
-
-    if (chartType === 'bar') {
-      return {
-        labels: WEEKDAY_LABELS,
-        datasets: [
-          {
-            label: `Promedio semanal ${baseLabel}`,
-            data: toWeeklyAverageSeries(rows, selectedKey, filters.week),
-            borderColor: color,
-            backgroundColor: `${color}77`,
-            borderRadius: 6,
-            borderWidth: 1.5,
-          },
-        ],
-      };
-    }
+  const lineData = useMemo(() => {
+    const unit = getUnitForKey(lineKey);
+    const label = getVariableDisplayName(lineKey);
 
     return {
       labels: lineLabels,
       datasets: [
         {
-          label: baseLabel,
-          data: toSeries(rows, selectedKey),
-          borderColor: color,
-          backgroundColor: `${color}33`,
+          label: unit ? `${label} (${unit})` : label,
+          data: toSeries(lineRows, lineKey),
+          borderColor: '#0f766e',
+          backgroundColor: 'rgba(15, 118, 110, 0.18)',
+          tension: 0.28,
+          borderWidth: 2.5,
+          fill: true,
           spanGaps: true,
-          tension: 0.25,
-          pointRadius: 1.5,
-          borderWidth: 2,
         },
       ],
     };
-  }, [chartType, filters.week, lineLabels, rows, selectedKey]);
+  }, [lineKey, lineLabels, lineRows]);
 
-  const chartOptions = useMemo(() => {
-    const unit = getUnitForKey(selectedKey);
-    const selectedLabel = getVariableDisplayName(selectedKey);
-    const yTitle = selectedKey ? (unit ? `${selectedLabel} (${unit})` : selectedLabel) : 'Valor';
-    const isBarChart = chartType === 'bar';
+  const barData = useMemo(() => {
+    const unit = getUnitForKey(barKey);
+    const label = getVariableDisplayName(barKey);
 
     return {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {
-        mode: 'index',
-        intersect: false,
-      },
-      elements: {
-        point: {
-          radius: isBarChart ? 2 : 0,
-          hoverRadius: 4,
+      labels: WEEKDAY_LABELS,
+      datasets: [
+        {
+          label: unit ? `Promedio semanal ${label} (${unit})` : `Promedio semanal ${label}`,
+          data: toWeeklyAverageSeries(barRows, barKey, filters.week),
+          borderColor: '#d97706',
+          backgroundColor: 'rgba(217, 119, 6, 0.35)',
+          borderRadius: 10,
+          borderWidth: 1.5,
         },
-      },
-      layout: {
-        padding: {
-          top: 8,
-          right: 12,
-          bottom: 4,
-          left: 4,
-        },
-      },
-      scales: {
-        x: {
-          grid: {
-            display: true,
-            drawOnChartArea: true,
-            color: 'rgba(200, 208, 220, 0.12)',
-            tickColor: 'rgba(200, 208, 220, 0.22)',
-            borderDash: [3, 3],
-            lineWidth: 1,
-          },
-          border: {
-            color: 'rgba(200, 208, 220, 0.35)',
-          },
-          ticks: {
-            maxRotation: 0,
-            autoSkip: !isBarChart,
-            maxTicksLimit: isBarChart ? undefined : 10,
-            color: '#4b5563',
-            font: {
-              size: 11,
-              weight: '600',
-            },
-          },
-          title: {
-            display: true,
-            text: isBarChart ? 'Dia de semana' : 'Fecha y hora (Chile)',
-            color: '#374151',
-          },
-        },
-        y: {
-          grace: '8%',
-          beginAtZero: false,
-          grid: {
-            display: true,
-            drawOnChartArea: true,
-            color: 'rgba(200, 208, 220, 0.16)',
-            tickColor: 'rgba(200, 208, 220, 0.24)',
-            borderDash: [4, 4],
-            lineWidth: 1,
-          },
-          border: {
-            color: 'rgba(200, 208, 220, 0.35)',
-          },
-          title: {
-            display: true,
-            text: yTitle,
-            color: '#374151',
-          },
-          ticks: {
-            color: '#4b5563',
-            font: {
-              size: 11,
-              weight: '600',
-            },
-            callback: (value) => {
-              const display = typeof value === 'number' ? value.toFixed(2) : String(value);
-              return unit ? `${display} ${unit}` : `${display}`;
-            },
-          },
-        },
-      },
-      plugins: {
-        legend: {
-          labels: {
-            color: '#374151',
-            boxWidth: 18,
-            boxHeight: 2,
-            usePointStyle: false,
-            font: {
-              size: 12,
-              weight: '700',
-            },
-          },
-        },
-        tooltip: {
-          backgroundColor: 'rgba(12, 16, 22, 0.95)',
-          borderColor: 'rgba(200, 208, 220, 0.25)',
-          borderWidth: 1,
-          titleColor: 'rgba(238, 242, 248, 0.95)',
-          bodyColor: 'rgba(238, 242, 248, 0.95)',
-          callbacks: {
-            label: (context) => {
-              const label = context.dataset?.label || selectedKey || 'Valor';
-              const value = context.parsed?.y;
-              const display = value === null || value === undefined ? '' : Number(value).toFixed(2);
-              return unit ? `${label}: ${display} ${unit}` : `${label}: ${display}`;
-            },
-          },
-        },
-      },
+      ],
     };
-  }, [chartType, selectedKey]);
+  }, [barKey, barRows, filters.week]);
+
+  const lineOptions = useMemo(
+    () => buildChartOptions({ selectedKey: lineKey, isBarChart: false }),
+    [lineKey],
+  );
+
+  const barOptions = useMemo(
+    () => buildChartOptions({ selectedKey: barKey, isBarChart: true }),
+    [barKey],
+  );
 
   function onFilterChange(event) {
     const { name, value } = event.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
   }
 
-  function onVariableChange(event) {
-    setSelectedKey(event.target.value);
-  }
-
   return (
     <section className="panel">
-      <h2>Graficos por variable en el tiempo</h2>
+      <div className="section-heading">
+        <div>
+          <span className="panel-kicker">Analitica</span>
+          <h2>Tendencias y promedios operativos</h2>
+        </div>
+        <button type="button" onClick={loadCharts} disabled={loading}>
+          {loading ? 'Actualizando...' : 'Actualizar panel'}
+        </button>
+      </div>
+
       <div className="panel-toolbar">
-        {chartType === 'bar' ? (
-          <label>
-            Semana
-            <input type="week" name="week" value={filters.week} onChange={onFilterChange} />
-          </label>
-        ) : (
-          <>
-            <label>
-              Desde
-              <input type="date" name="desde" value={filters.desde} onChange={onFilterChange} />
-            </label>
-            <label>
-              Hasta
-              <input type="date" name="hasta" value={filters.hasta} onChange={onFilterChange} />
-            </label>
-          </>
-        )}
+        <label>
+          Desde
+          <input type="date" name="desde" value={filters.desde} onChange={onFilterChange} />
+        </label>
+        <label>
+          Hasta
+          <input type="date" name="hasta" value={filters.hasta} onChange={onFilterChange} />
+        </label>
+        <label>
+          Semana barra
+          <input type="week" name="week" value={filters.week} onChange={onFilterChange} />
+        </label>
         <label>
           Limite
           <input
@@ -396,52 +377,44 @@ export default function ChartsPanel({ refreshTick = 0 }) {
           />
         </label>
         <label className="variable-inline-selector">
-          Variable
-          <select value={selectedKey} onChange={onVariableChange}>
-            <option value="">Seleccionar variable</option>
-            {FIXED_VARIABLE_KEYS.map((key) => (
-              <option key={`var-${key}`} value={key}>
-                {getUnitForKey(key)
-                  ? `${getVariableDisplayName(key)} (${getUnitForKey(key)})`
-                  : getVariableDisplayName(key)}
+          Variable linea
+          <select value={lineKey} onChange={(event) => setLineKey(event.target.value)}>
+            {WEATHER_FIXED_KEYS.map((key) => (
+              <option key={`line-${key}`} value={key}>
+                {getVariableDisplayName(key)}
               </option>
             ))}
           </select>
         </label>
-        <div className="chart-type-toggle" role="group" aria-label="Tipo de grafico">
-          <button
-            type="button"
-            className={chartType === 'line' ? 'is-active' : ''}
-            onClick={() => setChartType('line')}
-          >
-            Linea
-          </button>
-          <button
-            type="button"
-            className={chartType === 'bar' ? 'is-active' : ''}
-            onClick={() => setChartType('bar')}
-          >
-            Barras
-          </button>
-        </div>
-        <button type="button" onClick={loadChart} disabled={loading}>
-          {loading ? 'Cargando...' : 'Actualizar grafico'}
-        </button>
+        <label className="variable-inline-selector">
+          Variable barras
+          <select value={barKey} onChange={(event) => setBarKey(event.target.value)}>
+            {WEATHER_FIXED_KEYS.map((key) => (
+              <option key={`bar-${key}`} value={key}>
+                {getVariableDisplayName(key)}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
-      <div className="chart-wrap">
-        {error && <p className="error">{error}</p>}
-        {loading && !error && <p className="muted">Actualizando grafico...</p>}
-        {!error && selectedKey && (
-          <div className="chart-canvas-shell">
-            {chartType === 'bar'
-              ? <Bar data={chartData} options={chartOptions} />
-              : <Line data={chartData} options={chartOptions} />}
-          </div>
-        )}
-        {!error && !selectedKey && !loading && (
-          <p className="muted">Selecciona al menos una variable para graficar.</p>
-        )}
+      {error && <p className="error">{error}</p>}
+      {loading && !error && <p className="muted">Consultando historico persistido...</p>}
+
+      <div className="chart-grid">
+        <ChartCard
+          title="Grafico de linea"
+          subtitle="Evolucion temporal de la variable seleccionada."
+        >
+          <Line data={lineData} options={lineOptions} />
+        </ChartCard>
+
+        <ChartCard
+          title="Grafico de barras"
+          subtitle="Promedio diario de la semana elegida."
+        >
+          <Bar data={barData} options={barOptions} />
+        </ChartCard>
       </div>
     </section>
   );

@@ -10,7 +10,9 @@ function buildRangeQuery({ desde, hasta, limit }) {
 
 export async function fetchWeatherRange(filters = {}) {
   const query = buildRangeQuery(filters);
-  const response = await fetch(`${API_BASE}weather/range?${query}`);
+  const response = await fetch(`${API_BASE}weather/range?${query}`, {
+    cache: 'no-store',
+  });
   if (!response.ok) {
     throw new Error('No se pudo obtener weather/range');
   }
@@ -19,9 +21,24 @@ export async function fetchWeatherRange(filters = {}) {
 }
 
 export async function fetchHealth() {
-  const response = await fetch(`${API_BASE}health`);
+  const response = await fetch(`${API_BASE}health`, {
+    cache: 'no-store',
+  });
   if (!response.ok) {
     throw new Error('No se pudo obtener health');
+  }
+  return response.json();
+}
+
+export async function fetchLatest() {
+  const response = await fetch(`${API_BASE}weather/latest`, {
+    cache: 'no-store',
+  });
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error('No se pudo obtener weather/latest');
   }
   return response.json();
 }

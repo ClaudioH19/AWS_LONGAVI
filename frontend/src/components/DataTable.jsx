@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { buildExportUrl, fetchWeatherRange } from '../api/weatherApi';
 import { formatDateTime, getTodayInChileDateInput } from '../utils/dateTime';
-import { getVariableDisplayName } from '../utils/weatherVariables';
+import {
+  formatWeatherValue,
+  getUnitForKey,
+  getVariableDisplayName,
+} from '../utils/weatherVariables';
 
 function isNumericValue(value) {
   return value !== null && value !== '' && !Number.isNaN(Number(value));
@@ -9,11 +13,11 @@ function isNumericValue(value) {
 
 function getColumnLabel(column) {
   if (column === 'id') return 'ID';
-  if (column === 'received_at') return 'Recibido (Chile)';
+  if (column === 'received_at') return 'Recibido en Chile';
   if (column === 'Timestamp') return 'Timestamp';
   if (column === 'DeviceID') return 'Dispositivo';
   if (column === 'DeviceType') return 'Tipo';
-  if (column === 'DeviceVersion') return 'Versión';
+  if (column === 'DeviceVersion') return 'Version';
   return getVariableDisplayName(column);
 }
 
@@ -47,7 +51,7 @@ export default function DataTable({ refreshTick = 0 }) {
       const data = await fetchWeatherRange(filters);
       setRows(data);
     } catch {
-      setError('No se pudieron cargar los datos de la tabla.');
+      setError('No se pudieron cargar los datos historicos.');
       setRows([]);
     } finally {
       setLoading(false);
@@ -75,7 +79,13 @@ export default function DataTable({ refreshTick = 0 }) {
 
   return (
     <section className="panel">
-      <h2>Tabla de datos</h2>
+      <div className="section-heading">
+        <div>
+          <span className="panel-kicker">Historico</span>
+          <h2>Tabla persistida de la estacion</h2>
+        </div>
+      </div>
+
       <div className="panel-toolbar">
         <label>
           Desde
@@ -86,7 +96,7 @@ export default function DataTable({ refreshTick = 0 }) {
           <input type="date" name="hasta" value={filters.hasta} onChange={onFilterChange} />
         </label>
         <label>
-          Límite
+          Limite
           <input
             type="number"
             min="1"
@@ -96,7 +106,9 @@ export default function DataTable({ refreshTick = 0 }) {
             onChange={onFilterChange}
           />
         </label>
-        <button onClick={loadTable} disabled={loading}>{loading ? 'Cargando...' : 'Filtrar'}</button>
+        <button type="button" onClick={loadTable} disabled={loading}>
+          {loading ? 'Cargando...' : 'Actualizar tabla'}
+        </button>
         <button type="button" onClick={clearFilters}>Limpiar</button>
         <button type="button" onClick={() => exportFile('csv')}>Exportar CSV</button>
         <button type="button" onClick={() => exportFile('json')}>Exportar JSON</button>
@@ -105,7 +117,7 @@ export default function DataTable({ refreshTick = 0 }) {
       {error && <p className="error">{error}</p>}
 
       {!error && rows.length === 0 && !loading && (
-        <p className="muted">Sin datos para el período seleccionado.</p>
+        <p className="muted">Sin datos para el periodo seleccionado.</p>
       )}
 
       {!error && rows.length > 0 && (
@@ -123,17 +135,20 @@ export default function DataTable({ refreshTick = 0 }) {
                 <tr key={`${row.id}-${row.received_at}`}>
                   {orderedColumns.map((column) => {
                     const value = row[column] ?? '';
+                    const hasWeatherUnit = Boolean(getUnitForKey(column));
                     const className =
                       column === 'received_at' || column === 'Timestamp'
                         ? 'ts'
                         : column === 'DeviceID' || column === 'DeviceType'
                           ? 'device'
-                          : isNumericValue(value)
+                          : isNumericValue(value) || hasWeatherUnit
                             ? 'numeric'
                             : '';
                     const displayValue =
                       column === 'received_at' || column === 'Timestamp'
                         ? formatDateTime(value, '')
+                        : hasWeatherUnit
+                          ? formatWeatherValue(column, value, '')
                         : String(value);
 
                     return (
