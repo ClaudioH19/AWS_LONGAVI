@@ -27,7 +27,11 @@ function SummaryCard({ weatherKey, value, updatedAt }) {
 }
 
 export default function OverviewPanel({ latest, status }) {
-  const readingTime = latest?.received_at || latest?.Timestamp || '';
+  // Solo received_at: Timestamp lo genera el firmware del equipo y puede
+  // venir corrupto (ej. "2026-07-182 09:58:24"), lo que mostraría una fecha
+  // rota o sin formatear. received_at es la hora en que el servidor recibió
+  // el dato y es la única fuente confiable. Consistente con ChartsPanel.
+  const readingTime = latest?.received_at || '';
   const deviceName = latest?.DeviceID || 'Sin equipo';
 
   return (

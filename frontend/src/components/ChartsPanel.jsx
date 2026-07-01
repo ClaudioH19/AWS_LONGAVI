@@ -14,7 +14,7 @@ import {
 } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
 import { fetchWeatherRange } from '../api/weatherApi';
-import { getTodayInChileDateInput } from '../utils/dateTime';
+import { getTodayInChileDateInput, parseDateTimeParts } from '../utils/dateTime';
 import {
   WEATHER_FIXED_KEYS,
   getVariableDisplayName,
@@ -77,18 +77,27 @@ function getCurrentWeekBounds() {
   };
 }
 
+// Solo received_at: el campo Timestamp lo genera el firmware del equipo y
+// puede venir corrupto (ej. "2026-07-182 09:58:24", con el día mal formado),
+// lo que rompía el parseo y desalineaba el día de la semana en el gráfico.
+// received_at es la hora en que el servidor recibió el dato (ya en hora de
+// Chile) y no depende del firmware del equipo, así que es la única fuente
+// confiable para agrupar por día.
 function getTimestampForRow(row) {
-  return row.Timestamp || row.received_at || '';
+  return row.received_at || '';
 }
 
+// Reusa el mismo parser central que usa formatDateTime/formatDateTimeShort,
+// para que el día de la semana se calcule siempre a partir de los mismos
+// año/mes/día que se muestran en el resto de la UI, sin duplicar el regex
+// ni arriesgar que las dos implementaciones diverjan.
 function getWeekdayIndex(value) {
-  const text = String(value || '').trim();
-  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!match) return null;
+  const parts = parseDateTimeParts(value);
+  if (!parts) return null;
 
-  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
-  const jsDay = date.getUTCDay();
-  return (jsDay + 6) % 7;
+  const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+  const jsDay = date.getUTCDay(); // 0 = Domingo ... 6 = Sábado
+  return (jsDay + 6) % 7; // 0 = Lunes ... 6 = Domingo
 }
 
 function buildWeeklySeries(rows, key, { fillMissingWithZero = false } = {}) {
@@ -115,6 +124,18 @@ function buildWeeklySeries(rows, key, { fillMissingWithZero = false } = {}) {
   });
 }
 
+// Paleta de marca Biovision: verde bosque oscuro + menta como acento.
+const BRAND = {
+  bar: '#5EE6A5', // menta (color de los botones "Explorar servicios" / "Abrir Autopilot")
+  barHover: '#7FEFB9',
+  line: '#F4F1E6', // crema, para que contraste sobre el menta y el fondo oscuro
+  linePoint: '#0F2A1C',
+  text: '#0F2A1C', // verde bosque oscuro para ejes/leyendas (fondo claro)
+  grid: 'rgba(15, 42, 28, 0.10)',
+  tooltipBg: 'rgba(15, 42, 28, 0.96)', // verde bosque oscuro
+  tooltipText: '#F4F1E6',
+};
+
 function buildChartOptions({ lineKey, barKey }) {
   const lineUnit = getUnitForKey(lineKey);
   const barUnit = getUnitForKey(barKey);
@@ -129,10 +150,10 @@ function buildChartOptions({ lineKey, barKey }) {
     scales: {
       x: {
         grid: {
-          color: 'rgba(34, 34, 34, 0.08)',
+          color: BRAND.grid,
         },
         ticks: {
-          color: '#1b1f23',
+          color: BRAND.text,
           font: {
             size: 12,
             weight: '600',
@@ -142,16 +163,16 @@ function buildChartOptions({ lineKey, barKey }) {
       y: {
         beginAtZero: true,
         grid: {
-          color: 'rgba(34, 34, 34, 0.08)',
+          color: BRAND.grid,
         },
         ticks: {
-          color: '#1b1f23',
+          color: BRAND.text,
           callback: (value) => (barUnit ? `${value} ${barUnit}` : `${value}`),
         },
         title: {
           display: true,
           text: barUnit ? `${getVariableDisplayName(barKey)} (${barUnit})` : getVariableDisplayName(barKey),
-          color: '#1b1f23',
+          color: BRAND.text,
         },
       },
       y1: {
@@ -161,29 +182,29 @@ function buildChartOptions({ lineKey, barKey }) {
           drawOnChartArea: false,
         },
         ticks: {
-          color: '#1b1f23',
+          color: BRAND.text,
           callback: (value) => (lineUnit ? `${value} ${lineUnit}` : `${value}`),
         },
         title: {
           display: true,
           text: lineUnit ? `${getVariableDisplayName(lineKey)} (${lineUnit})` : getVariableDisplayName(lineKey),
-          color: '#1b1f23',
+          color: BRAND.text,
         },
       },
     },
     plugins: {
       legend: {
         labels: {
-          color: '#1b1f23',
+          color: BRAND.text,
           font: {
             weight: '700',
           },
         },
       },
       tooltip: {
-        backgroundColor: 'rgba(24, 24, 27, 0.96)',
-        titleColor: '#f8fafc',
-        bodyColor: '#f8fafc',
+        backgroundColor: BRAND.tooltipBg,
+        titleColor: BRAND.tooltipText,
+        bodyColor: BRAND.tooltipText,
       },
     },
   };

@@ -1,5 +1,7 @@
 const DATE_TIME_REGEX = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/;
 
+const WEEKDAY_LABELS_ES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
 function getDatePart(parts, type) {
   return parts.find((part) => part.type === type)?.value || '00';
 }
@@ -65,4 +67,18 @@ export function parseDateTimeAsLocal(value) {
     parts.minute,
     parts.second,
   );
+}
+
+// NUEVO: día de la semana calculado SIN pasar por new Date(rawString),
+// para que nunca se desalinee con formatDateTime/formatDateTimeShort.
+export function getDayOfWeekIndex(value) {
+  const date = parseDateTimeAsLocal(value);
+  if (!date) return null;
+  return date.getDay(); // 0 = Domingo ... 6 = Sábado
+}
+
+export function getDayOfWeekLabel(value, fallback = '') {
+  const index = getDayOfWeekIndex(value);
+  if (index === null) return fallback;
+  return WEEKDAY_LABELS_ES[index];
 }
