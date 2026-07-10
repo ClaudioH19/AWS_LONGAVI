@@ -39,11 +39,13 @@ function App() {
     serverTimeChile: '',
   });
   const [latest, setLatest] = useState(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
 
     async function loadDashboard() {
+      setDashboardLoading(true);
       const [healthResult, latestResult] = await Promise.allSettled([
         fetchHealth(),
         fetchLatest(),
@@ -70,6 +72,8 @@ function App() {
       } else {
         setLatest(null);
       }
+
+      setDashboardLoading(false);
     }
 
     loadDashboard();
@@ -109,7 +113,7 @@ function App() {
 
       <section id="panel" className="dashboard-section">
         <main>
-          <OverviewPanel latest={latest} status={status} />
+          <OverviewPanel latest={latest} status={status} loading={dashboardLoading} />
 
           <nav className="panel-nav" aria-label="Cambiar vista">
             <button

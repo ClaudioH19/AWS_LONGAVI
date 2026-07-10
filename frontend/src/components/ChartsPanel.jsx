@@ -14,6 +14,7 @@ import {
 } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
 import { fetchWeatherRange } from '../api/weatherApi';
+import StatusState from './StatusState';
 import { getTodayInChileDateInput, parseDateTimeParts } from '../utils/dateTime';
 import {
   WEATHER_FIXED_KEYS,
@@ -124,16 +125,13 @@ function buildWeeklySeries(rows, key, { fillMissingWithZero = false } = {}) {
   });
 }
 
-// Paleta de marca Biovision: verde bosque oscuro + menta como acento.
 const BRAND = {
-  bar: '#5EE6A5', // menta (color de los botones "Explorar servicios" / "Abrir Autopilot")
-  barHover: '#7FEFB9',
-  line: '#F4F1E6', // crema, para que contraste sobre el menta y el fondo oscuro
-  linePoint: '#0F2A1C',
-  text: '#0F2A1C', // verde bosque oscuro para ejes/leyendas (fondo claro)
-  grid: 'rgba(15, 42, 28, 0.10)',
-  tooltipBg: 'rgba(15, 42, 28, 0.96)', // verde bosque oscuro
-  tooltipText: '#F4F1E6',
+  emerald: '#13B76C',
+  forest: '#082D1F',
+  text: '#0B2D1B',
+  grid: 'rgba(8, 45, 31, 0.09)',
+  tooltipBg: 'rgba(8, 45, 31, 0.96)',
+  tooltipText: '#FFFFFF',
 };
 
 function buildChartOptions({ lineKey, barKey }) {
@@ -241,7 +239,6 @@ export default function ChartsPanel({ refreshTick = 0 }) {
 
   useEffect(() => {
     loadCharts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTick]);
 
   const chartData = useMemo(() => {
@@ -252,9 +249,9 @@ export default function ChartsPanel({ refreshTick = 0 }) {
         type: 'bar',
         label: `${getVariableDisplayName(barKey)} por día`,
         data: buildWeeklySeries(rows, barKey, { fillMissingWithZero: true }),
-        backgroundColor: '#ff6b35',
-        borderColor: '#ff6b35',
-        borderRadius: 10,
+        backgroundColor: BRAND.emerald,
+        borderColor: BRAND.emerald,
+        borderRadius: 6,
         borderWidth: 1,
         yAxisID: 'y',
         order: 2,
@@ -266,9 +263,9 @@ export default function ChartsPanel({ refreshTick = 0 }) {
         type: 'line',
         label: `${getVariableDisplayName(lineKey)} por día`,
         data: buildWeeklySeries(rows, lineKey),
-        borderColor: '#0f9d58',
-        backgroundColor: '#0f9d58',
-        pointBackgroundColor: '#0f9d58',
+        borderColor: BRAND.forest,
+        backgroundColor: BRAND.forest,
+        pointBackgroundColor: BRAND.forest,
         pointBorderColor: '#ffffff',
         pointBorderWidth: 2,
         pointRadius: 4,
@@ -339,17 +336,50 @@ export default function ChartsPanel({ refreshTick = 0 }) {
         </button>
       </div>
 
-      {error && <p className="error">{error}</p>}
-      {loading && !error && <p className="muted">Cargando semana actual…</p>}
-      {!loading && !error && !showLine && !showBar && (
-        <p className="muted">Activa al menos una serie para visualizar el gráfico.</p>
+      {error && (
+        <StatusState
+          title="Estación fuera de línea"
+          message="No se pudieron cargar los gráficos desde el backend."
+          onRetry={loadCharts}
+        />
       )}
-
-      <div className="chart-single-wrap">
-        <div className="chart-canvas-shell">
-          <Chart type="bar" data={chartData} options={chartOptions} />
+      {loading && !error && (
+        <div className="chart-canvas-shell chart-loading" aria-label="Cargando gráficos">
+          <span className="spinner" />
+          <div className="skeleton-chart">
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
         </div>
-      </div>
+      )}
+      {!loading && !error && !showLine && !showBar && (
+        <StatusState
+          title="No hay series activas"
+          message="Activa al menos una serie para visualizar el gráfico."
+          actionLabel="Activar series"
+          onRetry={() => {
+            setShowLine(true);
+            setShowBar(true);
+          }}
+        />
+      )}
+      {!loading && !error && rows.length === 0 && (showLine || showBar) && (
+        <StatusState
+          title="No hay datos disponibles"
+          message="No existen lecturas para la semana actual."
+          onRetry={loadCharts}
+        />
+      )}
+      {!loading && !error && rows.length > 0 && (showLine || showBar) && (
+        <div className="chart-single-wrap">
+          <div className="chart-canvas-shell">
+            <Chart type="bar" data={chartData} options={chartOptions} />
+          </div>
+        </div>
+      )}
     </section>
   );
 }

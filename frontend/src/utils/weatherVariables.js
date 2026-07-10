@@ -79,8 +79,8 @@ export function formatWeatherValue(key = '', value, fallback = '--') {
 
   const unit = getUnitForKey(key);
   const formatted = scaledValue.toLocaleString('es-CL', {
-    minimumFractionDigits: scaledValue % 1 === 0 ? 0 : 1,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
   });
 
   return unit ? `${formatted} ${unit}` : formatted;

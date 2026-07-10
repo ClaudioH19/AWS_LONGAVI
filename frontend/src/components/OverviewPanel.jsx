@@ -14,19 +14,28 @@ const CARD_TONES = {
   Rad: 'is-rad',
 };
 
-function SummaryCard({ weatherKey, value, updatedAt }) {
+function SummaryCard({ weatherKey, value, updatedAt, loading }) {
   return (
     <article className={`summary-card ${CARD_TONES[weatherKey] || ''}`}>
       <span className="summary-label">{getVariableDisplayName(weatherKey)}</span>
-      <strong className="summary-value">{formatWeatherValue(weatherKey, value)}</strong>
-      <span className="summary-meta">
-        {updatedAt ? `Actualizado: ${formatDateTime(updatedAt)}` : 'Sin lectura reciente'}
-      </span>
+      {loading ? (
+        <>
+          <span className="skeleton skeleton-value" />
+          <span className="skeleton skeleton-line" />
+        </>
+      ) : (
+        <>
+          <strong className="summary-value">{formatWeatherValue(weatherKey, value)}</strong>
+          <span className="summary-meta">
+            {updatedAt ? `Actualizado: ${formatDateTime(updatedAt)}` : 'Sin lectura reciente'}
+          </span>
+        </>
+      )}
     </article>
   );
 }
 
-export default function OverviewPanel({ latest, status }) {
+export default function OverviewPanel({ latest, status, loading = false }) {
   // Solo received_at: Timestamp lo genera el firmware del equipo y puede
   // venir corrupto (ej. "2026-07-182 09:58:24"), lo que mostraría una fecha
   // rota o sin formatear. received_at es la hora en que el servidor recibió
@@ -59,6 +68,7 @@ export default function OverviewPanel({ latest, status }) {
             weatherKey={key}
             value={latest?.[key]}
             updatedAt={readingTime}
+            loading={loading}
           />
         ))}
       </div>

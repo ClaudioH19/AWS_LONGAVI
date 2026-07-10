@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { buildExportUrl, fetchWeatherRange } from '../api/weatherApi';
+import StatusState from './StatusState';
 import { formatDateTime, getTodayInChileDateInput } from '../utils/dateTime';
 import {
   formatWeatherValue,
@@ -21,6 +22,8 @@ function getColumnLabel(column) {
   return getVariableDisplayName(column);
 }
 
+const HIDDEN_UI_COLUMNS = new Set(['id', 'DeviceID', 'DeviceType', 'DeviceVersion', 'Timestamp']);
+
 export default function DataTable({ refreshTick = 0 }) {
   const [filters, setFilters] = useState({
     desde: '',
@@ -41,7 +44,7 @@ export default function DataTable({ refreshTick = 0 }) {
     const presentPinned = pinned.filter((key) => all.includes(key));
     const presentFixed = fixedVariables.filter((key) => all.includes(key));
     const rest = all.filter((key) => !pinned.includes(key) && !fixedVariables.includes(key));
-    return [...presentPinned, ...presentFixed, ...rest];
+    return [...presentPinned, ...presentFixed, ...rest].filter((key) => !HIDDEN_UI_COLUMNS.has(key));
   }, [rows]);
 
   async function loadTable() {
@@ -114,11 +117,37 @@ export default function DataTable({ refreshTick = 0 }) {
         <button type="button" onClick={() => exportFile('json')}>Exportar JSON</button>
       </div>
 
-      {error && <p className="error">{error}</p>}
+      {error && (
+        <StatusState
+          title="Estación fuera de línea"
+          message="No se pudieron cargar los datos históricos."
+          onRetry={loadTable}
+        />
+      )}
 
-      {!error && rows.length === 0 && !loading && <p className="muted">Sin datos para el período seleccionado.</p>}
+      {!error && loading && (
+        <div className="table-wrap table-loading" aria-label="Cargando tabla">
+          <div className="skeleton-table">
+            {Array.from({ length: 7 }).map((_, rowIndex) => (
+              <div className="skeleton-row" key={`loading-row-${rowIndex}`}>
+                {Array.from({ length: 6 }).map((__, columnIndex) => (
+                  <span key={`loading-cell-${rowIndex}-${columnIndex}`} className="skeleton" />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-      {!error && rows.length > 0 && (
+      {!error && rows.length === 0 && !loading && (
+        <StatusState
+          title="No hay datos disponibles"
+          message="No se encontraron lecturas para el período seleccionado."
+          onRetry={loadTable}
+        />
+      )}
+
+      {!error && rows.length > 0 && !loading && (
         <div className="table-wrap">
           <table>
             <thead>
