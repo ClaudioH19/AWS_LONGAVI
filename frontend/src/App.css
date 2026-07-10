@@ -1,17 +1,17 @@
 :root {
-  --bg: #f4f9f6;
-  --surface: #ffffff;
-  --surface-strong: #ffffff;
-  --border: #dcebe2;
-  --border-muted: #edf4ef;
-  --text: #082d1f;
-  --text-dim: #60746b;
-  --brand: #0f7a5a;
-  --brand-strong: #064e3b;
-  --brand-soft: #e3f3ea;
+  --bg: #f8fafc;
+  --surface: #fafafa;
+  --surface-strong: #fafafa;
+  --border: #e5e7eb;
+  --border-muted: #eef1f3;
+  --text: #022e23;
+  --text-dim: #587067;
+  --brand: #047756;
+  --brand-strong: #022e23;
+  --brand-soft: #dff3ec;
   --danger: #b42318;
   --warning: #a15c07;
-  --shadow: 0 4px 14px rgba(8, 45, 31, 0.06);
+  --shadow: 0 4px 14px rgba(2, 46, 35, 0.07);
 }
 
 * {
@@ -33,7 +33,7 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.65rem 1.2rem;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(250, 250, 250, 0.94);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(10px);
 }
@@ -129,12 +129,18 @@ main {
   display: grid;
   gap: 0.7rem;
   align-content: space-between;
-  background: #ffffff;
+  background: var(--brand-strong);
+  border-color: var(--brand-strong);
 }
 
 .overview-copy {
   display: grid;
   gap: 0.35rem;
+}
+
+.overview-hero .eyebrow {
+  color: #fafafa;
+  background: var(--brand);
 }
 
 .eyebrow,
@@ -156,12 +162,13 @@ main {
   font-size: clamp(1.55rem, 3vw, 2.35rem);
   line-height: 1.05;
   letter-spacing: 0;
+  color: #fafafa;
 }
 
 .overview-hero p {
   margin: 0;
   max-width: 680px;
-  color: var(--text-dim);
+  color: #d3e7e0;
   font-size: 0.86rem;
 }
 
@@ -172,9 +179,9 @@ main {
 }
 
 .health-chip {
-  color: var(--text-dim);
-  background: #ffffff;
-  border-color: var(--border);
+  color: #eef8f4;
+  background: rgba(250, 250, 250, 0.08);
+  border-color: rgba(250, 250, 250, 0.22);
 }
 
 .summary-grid {
@@ -204,6 +211,66 @@ main {
 }
 
 .summary-card.is-danger {
+  background: #fee2e2;
+  border-color: #fecaca;
+}
+
+.summary-card.is-temperature-cold {
+  background: #dbeafe;
+  border-color: #bfdbfe;
+}
+
+.summary-card.is-temperature-normal {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+.summary-card.is-temperature-hot {
+  background: #ffedd5;
+  border-color: #fed7aa;
+}
+
+.summary-card.is-radiation-low {
+  background: #fef9c3;
+  border-color: #fef08a;
+}
+
+.summary-card.is-radiation-normal {
+  background: #fef08a;
+  border-color: #fde047;
+}
+
+.summary-card.is-radiation-high {
+  background: #fdba74;
+  border-color: #fb923c;
+}
+
+.summary-card.is-precipitation-none {
+  background: #f0f9ff;
+  border-color: #e0f2fe;
+}
+
+.summary-card.is-precipitation-present {
+  background: #bae6fd;
+  border-color: #7dd3fc;
+}
+
+.summary-card.is-precipitation-heavy {
+  background: #7dd3fc;
+  border-color: #38bdf8;
+}
+
+.summary-card.is-wind-safe {
+  background: #d1fae5;
+  border-color: #a7f3d0;
+}
+
+.summary-card.is-wind-normal {
+  background: #ecfdf5;
+  border-color: #d1fae5;
+}
+
+.summary-card.is-wind-danger {
   background: #fee2e2;
   border-color: #fecaca;
 }
@@ -259,7 +326,7 @@ main {
 }
 
 .panel-nav button.is-active {
-  background: var(--brand-strong);
+  background: var(--brand);
   color: #ffffff;
   font-weight: 700;
 }
@@ -324,13 +391,25 @@ main {
 .panel button:hover,
 .panel-nav button:hover {
   border-color: var(--brand-strong);
-  background: #f6fbf8;
+  background: #f8fafc;
 }
 
 .panel-nav button.is-active:hover,
 .toggle-button.is-active:hover {
-  background: var(--brand-strong);
+  background: var(--brand);
   color: #ffffff;
+}
+
+.section-heading > button {
+  color: #fafafa;
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.section-heading > button:hover {
+  color: #fafafa;
+  background: var(--brand-strong);
+  border-color: var(--brand-strong);
 }
 
 .panel button:disabled {
@@ -382,7 +461,7 @@ main {
   padding: 0.5rem;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: #ffffff;
+  background: #fafafa;
 }
 
 .trend-stack {
@@ -418,7 +497,7 @@ main {
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #ffffff;
+  background: #fafafa;
 }
 
 .daily-summary-table {
@@ -482,7 +561,7 @@ main {
   overscroll-behavior: contain;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #ffffff;
+  background: #fafafa;
 }
 
 table {
