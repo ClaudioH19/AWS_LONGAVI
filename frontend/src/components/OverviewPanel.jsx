@@ -3,20 +3,16 @@ import {
   WEATHER_FIXED_KEYS,
   formatWeatherValue,
   getVariableDisplayName,
+  scaleWeatherValue,
 } from '../utils/weatherVariables';
-
-const CARD_TONES = {
-  Temp: 'is-temp',
-  Hum: 'is-hum',
-  Vel: 'is-vel',
-  Dir: 'is-dir',
-  Precip: 'is-precip',
-  Rad: 'is-rad',
-};
+import StatusState from './StatusState';
+import { getAgronomicTone } from '../config/agronomicThresholds';
 
 function SummaryCard({ weatherKey, value, updatedAt, loading }) {
+  const tone = getAgronomicTone(weatherKey, scaleWeatherValue(weatherKey, value));
+
   return (
-    <article className={`summary-card ${CARD_TONES[weatherKey] || ''}`}>
+    <article className={`summary-card is-${tone}`}>
       <span className="summary-label">{getVariableDisplayName(weatherKey)}</span>
       {loading ? (
         <>
@@ -42,6 +38,7 @@ export default function OverviewPanel({ latest, status, loading = false }) {
   // el dato y es la única fuente confiable. Consistente con ChartsPanel.
   const readingTime = latest?.received_at || '';
   const deviceName = latest?.DeviceID || 'Sin equipo';
+  const hasRecentReading = Boolean(readingTime) && status.toneClass === 'is-ok';
 
   return (
     <section className="overview-stack">
@@ -61,17 +58,29 @@ export default function OverviewPanel({ latest, status, loading = false }) {
         </div>
       </article>
 
-      <div className="summary-grid">
-        {WEATHER_FIXED_KEYS.map((key) => (
-          <SummaryCard
-            key={key}
-            weatherKey={key}
-            value={latest?.[key]}
-            updatedAt={readingTime}
-            loading={loading}
-          />
-        ))}
-      </div>
+      {loading ? (
+        <div className="summary-grid">
+          {WEATHER_FIXED_KEYS.map((key) => (
+            <SummaryCard key={key} weatherKey={key} loading />
+          ))}
+        </div>
+      ) : hasRecentReading ? (
+        <div className="summary-grid">
+          {WEATHER_FIXED_KEYS.map((key) => (
+            <SummaryCard
+              key={key}
+              weatherKey={key}
+              value={latest?.[key]}
+              updatedAt={readingTime}
+            />
+          ))}
+        </div>
+      ) : (
+        <StatusState
+          title="Estado de la estación"
+          message="Sin lectura reciente. Revisa la conexión y vuelve a intentarlo."
+        />
+      )}
     </section>
   );
 }

@@ -6,6 +6,6 @@ body,
 }
 
 body {
-  font-family: 'Manrope', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   background: #f4f9f6;
 }
