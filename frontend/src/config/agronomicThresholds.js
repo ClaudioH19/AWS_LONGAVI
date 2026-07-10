@@ -1,33 +1,24 @@
 export const AGRONOMIC_THRESHOLDS = {
-  temperature: { cold: 5, hot: 26 },
-  humidity: { low: 40, high: 70 },
-  radiation: { high: 500 },
+  Temp: { safe: [[10, 26]], normal: [[5, 10], [26, 32]] },
+  Hum: { safe: [[40, 70]], normal: [[30, 40], [70, 80]] },
+  Precip: { safe: [[0.1, 5]], normal: [[0, 0]] },
+  Rad: { safe: [[200, 600]], normal: [[0, 200], [600, 800]] },
+  Vel: { safe: [[0, 5]], normal: [[5, 8]] },
+  Dir: { safe: [], normal: [[0, 360]] },
 };
+
+function isWithinRanges(value, ranges) {
+  return ranges.some(([min, max]) => value >= min && value <= max);
+}
 
 export function getAgronomicTone(weatherKey, value) {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return 'neutral';
   }
 
-  if (weatherKey === 'Temp') {
-    if (value < AGRONOMIC_THRESHOLDS.temperature.cold) return 'temperature-cold';
-    if (value > AGRONOMIC_THRESHOLDS.temperature.hot) return 'temperature-hot';
-    return 'temperature-optimal';
-  }
-
-  if (weatherKey === 'Hum') {
-    if (value < AGRONOMIC_THRESHOLDS.humidity.low) return 'humidity-low';
-    if (value > AGRONOMIC_THRESHOLDS.humidity.high) return 'humidity-high';
-    return 'humidity-optimal';
-  }
-
-  if (weatherKey === 'Precip') {
-    return value > 0 ? 'precipitation-present' : 'precipitation-none';
-  }
-
-  if (weatherKey === 'Rad') {
-    return value > AGRONOMIC_THRESHOLDS.radiation.high ? 'radiation-high' : 'radiation-low';
-  }
-
-  return 'neutral';
+  const thresholds = AGRONOMIC_THRESHOLDS[weatherKey];
+  if (!thresholds) return 'normal';
+  if (isWithinRanges(value, thresholds.safe)) return 'safe';
+  if (isWithinRanges(value, thresholds.normal)) return 'normal';
+  return 'danger';
 }

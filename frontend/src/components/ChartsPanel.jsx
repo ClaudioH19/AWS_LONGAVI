@@ -24,7 +24,6 @@ import {
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const MOCK_LOADING_DELAY_MS = 350;
-const MOCK_OFFLINE_DELAY_MS = 5000;
 const COLORS = {
   grid: '#E5E7EB',
   text: '#0B2D1B',
@@ -239,11 +238,10 @@ function getBarColors(key) {
   return BAR_COLORS[key] || BAR_COLORS.Dir;
 }
 
-export default function ChartsPanel({ refreshTick = 0 }) {
+export default function ChartsPanel({ refreshTick = 0, status }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [mockSession, setMockSession] = useState(0);
-  const [stationOffline, setStationOffline] = useState(false);
   const [lineKey, setLineKey] = useState('Temp');
   const [barKey, setBarKey] = useState('Hum');
 
@@ -253,19 +251,14 @@ export default function ChartsPanel({ refreshTick = 0 }) {
 
   useEffect(() => {
     setLoading(true);
-    setStationOffline(false);
 
     const loadTimer = window.setTimeout(() => {
       setRows(buildMockWeatherRows());
       setLoading(false);
     }, MOCK_LOADING_DELAY_MS);
-    const offlineTimer = window.setTimeout(() => {
-      setStationOffline(true);
-    }, MOCK_LOADING_DELAY_MS + MOCK_OFFLINE_DELAY_MS);
 
     return () => {
       window.clearTimeout(loadTimer);
-      window.clearTimeout(offlineTimer);
     };
   }, [mockSession, refreshTick]);
 
@@ -307,6 +300,11 @@ export default function ChartsPanel({ refreshTick = 0 }) {
     () => buildOptions({ leftAxisTitle: getSeriesLabel(lineKey), rightAxisTitle: getSeriesLabel(barKey) }),
     [barKey, lineKey],
   );
+  const stationIssue = status?.toneClass && status.toneClass !== 'is-ok';
+  const stationTitle = status?.toneClass === 'is-error' ? 'Estación fuera de línea' : 'Estación con interrupciones';
+  const stationMessage = status?.toneClass === 'is-error'
+    ? 'No se pudo verificar la conexión con la estación.'
+    : 'La estación no ha entregado una lectura reciente.';
 
   return (
     <section className="panel trends-panel">
@@ -340,7 +338,7 @@ export default function ChartsPanel({ refreshTick = 0 }) {
       </div>
 
       <div className="chart-workspace">
-        <div className={stationOffline ? 'chart-visuals is-offline' : 'chart-visuals'}>
+        <div className={stationIssue ? 'chart-visuals is-offline' : 'chart-visuals'}>
           {loading && (
             <div className="chart-canvas-shell chart-loading" aria-label="Cargando gráficos">
               <span className="spinner" />
@@ -366,11 +364,11 @@ export default function ChartsPanel({ refreshTick = 0 }) {
             </div>
           )}
         </div>
-        {stationOffline && (
+        {stationIssue && (
           <div className="chart-offline-overlay">
             <StatusState
-              title="Estación fuera de línea"
-              message="Se interrumpió la recepción de datos de la estación."
+              title={stationTitle}
+              message={stationMessage}
               actionLabel="Reintentar conexión"
               onRetry={loadCharts}
             />

@@ -193,50 +193,19 @@ main {
   box-shadow: none;
 }
 
-.summary-card.is-temperature-cold {
-  background: #dbeafe;
-  border-color: #bfdbfe;
-}
-
-.summary-card.is-temperature-optimal,
-.summary-card.is-humidity-optimal {
+.summary-card.is-safe {
   background: #d1fae5;
   border-color: #a7f3d0;
 }
 
-.summary-card.is-temperature-hot {
+.summary-card.is-normal {
+  background: #ffffff;
+  border-color: #dcebe2;
+}
+
+.summary-card.is-danger {
   background: #fee2e2;
   border-color: #fecaca;
-}
-
-.summary-card.is-humidity-low {
-  background: #fef3c7;
-  border-color: #fde68a;
-}
-
-.summary-card.is-humidity-high {
-  background: #bfdbfe;
-  border-color: #93c5fd;
-}
-
-.summary-card.is-precipitation-none {
-  background: #f3f4f6;
-  border-color: #e5e7eb;
-}
-
-.summary-card.is-precipitation-present {
-  background: #bae6fd;
-  border-color: #7dd3fc;
-}
-
-.summary-card.is-radiation-low {
-  background: #fef08a;
-  border-color: #fde047;
-}
-
-.summary-card.is-radiation-high {
-  background: #fdba74;
-  border-color: #fb923c;
 }
 
 .summary-label {

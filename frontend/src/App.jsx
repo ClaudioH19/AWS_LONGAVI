@@ -133,7 +133,7 @@ function App() {
           </nav>
 
           {activeView === 'charts' ? (
-            <ChartsPanel refreshTick={refreshTick} />
+            <ChartsPanel refreshTick={refreshTick} status={status} />
           ) : (
             <DataTable refreshTick={refreshTick} />
           )}
