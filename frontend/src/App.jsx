@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
+import { io } from 'socket.io-client';
 import ChartsPanel from './components/ChartsPanel';
 import DataTable from './components/DataTable';
 import OverviewPanel from './components/OverviewPanel';
 import { fetchHealth, fetchLatest } from './api/weatherApi';
 import { formatDateTime, parseDateTimeAsLocal } from './utils/dateTime';
 import './App.css';
+
+const HEALTH_POLL_INTERVAL_MS = 60000;
+const RANGE_RECONCILE_EVERY_POLLS = 5;
 
 function getStatusModel({ healthOk, latestTimestamp, serverTimestamp }) {
   if (!healthOk) {
@@ -39,13 +43,15 @@ function App() {
     serverTimeChile: '',
   });
   const [latest, setLatest] = useState(null);
+  const [liveReading, setLiveReading] = useState(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
+    let pollCount = 0;
 
-    async function loadDashboard() {
-      setDashboardLoading(true);
+    async function loadDashboard({ initial = false } = {}) {
+      if (initial) setDashboardLoading(true);
       const [healthResult, latestResult] = await Promise.allSettled([
         fetchHealth(),
         fetchLatest(),
@@ -73,19 +79,54 @@ function App() {
         setLatest(null);
       }
 
-      setDashboardLoading(false);
+      if (initial) setDashboardLoading(false);
     }
 
-    loadDashboard();
+    loadDashboard({ initial: true });
     const timer = setInterval(() => {
       loadDashboard();
-      setRefreshTick((prev) => prev + 1);
-    }, 30000);
+      pollCount += 1;
+      if (pollCount % RANGE_RECONCILE_EVERY_POLLS === 0) {
+        setRefreshTick((prev) => prev + 1);
+      }
+    }, HEALTH_POLL_INTERVAL_MS);
 
     return () => {
       active = false;
       clearInterval(timer);
     };
+  }, []);
+
+  useEffect(() => {
+    const socket = io('/', {
+      path: '/socket.io',
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
+    });
+
+    socket.on('connect', () => {
+      // Reconciles any readings published while the dashboard was disconnected.
+      setRefreshTick((current) => current + 1);
+    });
+
+    socket.on('weather:reading', (event) => {
+      const reading = event?.reading;
+      if (!reading) return;
+
+      const receivedAt = event.last_received_at || reading.received_at || '';
+      setLatest(reading);
+      setLiveReading(reading);
+      setHealth((previous) => ({
+        ...previous,
+        ok: true,
+        ultimo: receivedAt || previous.ultimo,
+        serverTimeChile: event.server_time_chile || previous.serverTimeChile,
+      }));
+    });
+
+    return () => socket.close();
   }, []);
 
   const latestTimestamp = latest?.received_at || latest?.Timestamp || health.ultimo;
@@ -133,9 +174,9 @@ function App() {
           </nav>
 
           {activeView === 'charts' ? (
-            <ChartsPanel refreshTick={refreshTick} status={status} />
+            <ChartsPanel refreshTick={refreshTick} status={status} liveReading={liveReading} />
           ) : (
-            <DataTable refreshTick={refreshTick} />
+            <DataTable refreshTick={refreshTick} liveReading={liveReading} />
           )}
         </main>
       </section>

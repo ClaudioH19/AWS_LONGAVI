@@ -12,6 +12,7 @@ import {
   Tooltip,
 } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
+import { fetchWeatherRange } from '../api/weatherApi';
 import DailySummaryTable from './DailySummaryTable';
 import StatusState from './StatusState';
 import { getTodayInChileDateInput, parseDateTimeParts } from '../utils/dateTime';
@@ -23,7 +24,6 @@ import {
 } from '../utils/weatherVariables';
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-const MOCK_LOADING_DELAY_MS = 350;
 const COLORS = {
   grid: '#E5E7EB',
   text: '#0B2D1B',
@@ -93,41 +93,6 @@ function getCurrentWeekBounds() {
   };
 }
 
-function formatMockTimestamp(date) {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
-  const hour = String(date.getUTCHours()).padStart(2, '0');
-  return `${year}-${month}-${day} ${hour}:00:00`;
-}
-
-function buildMockWeatherRows() {
-  const start = parseDateParts(getCurrentWeekBounds().desde);
-  if (!start) return [];
-
-  const firstHour = new Date(Date.UTC(start.year, start.month - 1, start.day));
-  return Array.from({ length: 7 * 24 }, (_, index) => {
-    const date = new Date(firstHour);
-    date.setUTCHours(index);
-
-    const hour = date.getUTCHours();
-    const day = Math.floor(index / 24);
-    const sunlight = Math.max(0, Math.sin(((hour - 6) / 12) * Math.PI));
-    const temperature = 12 + sunlight * 13 + Math.sin(day * 0.9) * 2;
-    const humidity = 78 - sunlight * 28 + Math.cos(day * 0.75) * 4;
-
-    return {
-      received_at: formatMockTimestamp(date),
-      Temp: Math.round(temperature * 10),
-      Hum: Math.round(humidity * 10),
-      Vel: Math.round((1.8 + Math.abs(Math.sin(index * 0.27)) * 4.4) * 10),
-      Dir: Math.round(((index * 19) % 360) * 10),
-      Precip: hour === 4 && day % 3 === 1 ? 18 : 0,
-      Rad: Math.round(sunlight * 9200),
-    };
-  });
-}
-
 function getWeekdayIndex(value) {
   const parts = parseDateTimeParts(value);
   if (!parts) return null;
@@ -149,7 +114,7 @@ function buildWeeklySeries(rows, key, aggregation = 'average') {
   });
 
   return totals.map((total, index) => {
-    if (!counts[index]) return aggregation === 'sum' ? 0 : null;
+    if (!counts[index]) return null;
     return Number((aggregation === 'sum' ? total : total / counts[index]).toFixed(2));
   });
 }
@@ -238,29 +203,57 @@ function getBarColors(key) {
   return BAR_COLORS[key] || BAR_COLORS.Dir;
 }
 
-export default function ChartsPanel({ refreshTick = 0, status }) {
+export default function ChartsPanel({ refreshTick = 0, status, liveReading = null }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [mockSession, setMockSession] = useState(0);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [loadError, setLoadError] = useState('');
   const [lineKey, setLineKey] = useState('Temp');
   const [barKey, setBarKey] = useState('Hum');
 
   const loadCharts = useCallback(() => {
-    setMockSession((current) => current + 1);
+    setReloadToken((current) => current + 1);
   }, []);
 
   useEffect(() => {
-    setLoading(true);
+    let active = true;
 
-    const loadTimer = window.setTimeout(() => {
-      setRows(buildMockWeatherRows());
-      setLoading(false);
-    }, MOCK_LOADING_DELAY_MS);
+    async function loadRealReadings() {
+      setLoading(true);
+      setLoadError('');
+
+      try {
+        const { desde, hasta } = getCurrentWeekBounds();
+        const data = await fetchWeatherRange({ desde, hasta, limit: 5000 });
+        if (!active) return;
+        setRows(data);
+      } catch {
+        if (!active) return;
+        setRows([]);
+        setLoadError('No se pudieron cargar las lecturas reales de la semana.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    loadRealReadings();
 
     return () => {
-      window.clearTimeout(loadTimer);
+      active = false;
     };
-  }, [mockSession, refreshTick]);
+  }, [refreshTick, reloadToken]);
+
+  useEffect(() => {
+    if (!liveReading) return;
+
+    setRows((previous) => {
+      const alreadyPresent = previous.some((row) => (
+        (liveReading.id && row.id === liveReading.id)
+        || row.received_at === liveReading.received_at
+      ));
+      return alreadyPresent ? previous : [liveReading, ...previous];
+    });
+  }, [liveReading]);
 
   const labels = useMemo(() => buildWeeklyLabels(), []);
   const baseChartData = useMemo(() => ({
@@ -345,14 +338,21 @@ export default function ChartsPanel({ refreshTick = 0, status }) {
               <div className="skeleton-chart"><span /><span /><span /><span /><span /></div>
             </div>
           )}
-          {!loading && rows.length === 0 && (
+          {!loading && loadError && (
             <StatusState
-              title="No hay datos disponibles"
-              message="No existen lecturas para construir las tendencias semanales."
+              title="No se pudieron cargar los datos"
+              message={loadError}
               onRetry={loadCharts}
             />
           )}
-          {!loading && rows.length > 0 && (
+          {!loading && !loadError && rows.length === 0 && (
+            <StatusState
+              title="No hay datos disponibles"
+              message="Aún no hay lecturas para esta semana."
+              onRetry={loadCharts}
+            />
+          )}
+          {!loading && !loadError && rows.length > 0 && (
             <div className="trend-stack">
               <section className="trend-chart" aria-labelledby="base-chart-title">
                 <h3 id="base-chart-title">{getComparisonQuestion(lineKey, barKey)}</h3>

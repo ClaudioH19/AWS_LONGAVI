@@ -24,7 +24,7 @@ function getColumnLabel(column) {
 
 const HIDDEN_UI_COLUMNS = new Set(['id', 'DeviceID', 'DeviceType', 'DeviceVersion', 'Timestamp']);
 
-export default function DataTable({ refreshTick = 0 }) {
+export default function DataTable({ refreshTick = 0, liveReading = null }) {
   const [filters, setFilters] = useState({
     desde: '',
     hasta: getTodayInChileDateInput(),
@@ -74,6 +74,25 @@ export default function DataTable({ refreshTick = 0 }) {
     loadTable();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, refreshTick]);
+
+  useEffect(() => {
+    if (!liveReading?.received_at) return;
+
+    const readingDate = liveReading.received_at.slice(0, 10);
+    if ((filters.desde && readingDate < filters.desde) || (filters.hasta && readingDate > filters.hasta)) {
+      return;
+    }
+
+    setRows((previous) => {
+      const alreadyPresent = previous.some((row) => (
+        (liveReading.id && row.id === liveReading.id)
+        || row.received_at === liveReading.received_at
+      ));
+      if (alreadyPresent) return previous;
+
+      return [liveReading, ...previous].slice(0, Number(filters.limit) || 100);
+    });
+  }, [filters.desde, filters.hasta, filters.limit, liveReading]);
 
   function exportFile(format) {
     const url = buildExportUrl(format, filters);
