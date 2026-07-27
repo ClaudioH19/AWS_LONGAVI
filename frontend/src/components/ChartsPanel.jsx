@@ -13,7 +13,7 @@ import {
 } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
 import { fetchWeatherRange } from '../api/weatherApi';
-import DataQualityCards from './DataQualityCards';
+import DataQualityAlerts from './DataQualityAlerts';
 import DailySummaryTable from './DailySummaryTable';
 import StatusState from './StatusState';
 import { getTodayInChileDateInput, parseDateTimeParts } from '../utils/dateTime';
@@ -226,21 +226,28 @@ export default function ChartsPanel({ refreshTick = 0, status, liveReading = nul
 
   useEffect(() => {
     let active = true;
+    let qualityTimer = null;
 
     async function loadRealReadings() {
       setLoading(true);
       setLoadError('');
+      setQualityRows([]);
 
       try {
         const chartBounds = getTrailingDaysBounds(7);
-        const qualityBounds = getTrailingDaysBounds(30);
-        const [data, historicalData] = await Promise.all([
-          fetchWeatherRange({ ...chartBounds, limit: 5000 }),
-          fetchWeatherRange({ ...qualityBounds, limit: 50000 }).catch(() => null),
-        ]);
+        const data = await fetchWeatherRange({ ...chartBounds, limit: 5000 });
         if (!active) return;
         setRows(data);
-        setQualityRows(historicalData || data);
+
+        qualityTimer = window.setTimeout(async () => {
+          try {
+            const qualityBounds = getTrailingDaysBounds(30);
+            const historicalData = await fetchWeatherRange({ ...qualityBounds, limit: 50000 });
+            if (active) setQualityRows(historicalData);
+          } catch {
+            if (active) setQualityRows(data);
+          }
+        }, 800);
       } catch {
         if (!active) return;
         setRows([]);
@@ -255,6 +262,7 @@ export default function ChartsPanel({ refreshTick = 0, status, liveReading = nul
 
     return () => {
       active = false;
+      if (qualityTimer !== null) window.clearTimeout(qualityTimer);
     };
   }, [refreshTick, reloadToken]);
 
@@ -371,7 +379,6 @@ export default function ChartsPanel({ refreshTick = 0, status, liveReading = nul
           )}
           {!loading && !loadError && rows.length > 0 && (
             <div className="trend-stack">
-              <DataQualityCards rows={qualityRows} days={qualityDays} />
               <section className="trend-chart" aria-labelledby="base-chart-title">
                 <h3 id="base-chart-title">{getComparisonQuestion(lineKey, barKey)}</h3>
                 <div className="chart-canvas-shell">
@@ -382,6 +389,9 @@ export default function ChartsPanel({ refreshTick = 0, status, liveReading = nul
             </div>
           )}
         </div>
+        {!loading && !loadError && rows.length > 0 && qualityRows.length > 0 && !stationIssue && (
+          <DataQualityAlerts rows={qualityRows} days={qualityDays} />
+        )}
         {stationIssue && (
           <div className="chart-offline-overlay">
             <StatusState
