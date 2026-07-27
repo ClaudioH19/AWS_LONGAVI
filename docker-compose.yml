@@ -11,6 +11,11 @@ services:
       - weather-data:/data
     env_file:
       - .env
+    environment:
+      DRAGONFLY_URL: redis://dragonfly:6379/0
+      SOCKETIO_CORS_ORIGINS: ${SOCKETIO_CORS_ORIGINS:-*}
+    depends_on:
+      - dragonfly
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3000/health')"]
       interval: 30s
@@ -22,6 +27,12 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
+    container_name: weather-realtime
+    restart: unless-stopped
+    command: ["--bind=0.0.0.0", "--port=6379"]
 
 volumes:
   weather-data:

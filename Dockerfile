@@ -19,7 +19,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends sqlite3 \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY backend ./backend
 COPY weather_server.py .
+COPY payload.js .
 COPY entrypoint.sh .
 COPY --from=frontend-builder /frontend/dist ./frontend_dist
 RUN chmod +x entrypoint.sh

@@ -13,6 +13,7 @@ import {
 } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
 import { fetchWeatherRange } from '../api/weatherApi';
+import DataQualityCards from './DataQualityCards';
 import DailySummaryTable from './DailySummaryTable';
 import StatusState from './StatusState';
 import { getTodayInChileDateInput, parseDateTimeParts } from '../utils/dateTime';
@@ -76,60 +77,63 @@ function toDateInputFromUTC(date) {
   return `${year}-${month}-${day}`;
 }
 
-function getCurrentWeekBounds() {
-  const today = parseDateParts(getTodayInChileDateInput());
+function getTrailingDaysBounds(totalDays = 7, dateInput = getTodayInChileDateInput()) {
+  const today = parseDateParts(dateInput);
   if (!today) return { desde: '', hasta: '' };
 
   const todayDate = new Date(Date.UTC(today.year, today.month - 1, today.day));
-  const mondayOffset = todayDate.getUTCDay() === 0 ? -6 : 1 - todayDate.getUTCDay();
-  const monday = new Date(todayDate);
-  monday.setUTCDate(todayDate.getUTCDate() + mondayOffset);
-  const sunday = new Date(monday);
-  sunday.setUTCDate(monday.getUTCDate() + 6);
+  const firstDay = new Date(todayDate);
+  firstDay.setUTCDate(todayDate.getUTCDate() - (totalDays - 1));
 
   return {
-    desde: toDateInputFromUTC(monday),
-    hasta: toDateInputFromUTC(sunday),
+    desde: toDateInputFromUTC(firstDay),
+    hasta: toDateInputFromUTC(todayDate),
   };
 }
 
-function getWeekdayIndex(value) {
+function getDateInputFromDateTime(value) {
   const parts = parseDateTimeParts(value);
   if (!parts) return null;
-  const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
-  return (date.getUTCDay() + 6) % 7;
+  return toDateInputFromUTC(new Date(Date.UTC(parts.year, parts.month - 1, parts.day)));
 }
 
-function buildWeeklySeries(rows, key, aggregation = 'average') {
-  const totals = Array(7).fill(0);
-  const counts = Array(7).fill(0);
-
-  rows.forEach((row) => {
-    const weekdayIndex = getWeekdayIndex(row.received_at);
-    const value = scaleWeatherValue(key, row[key]);
-    if (weekdayIndex === null || value === null) return;
-
-    totals[weekdayIndex] += value;
-    counts[weekdayIndex] += 1;
-  });
-
-  return totals.map((total, index) => {
-    if (!counts[index]) return null;
-    return Number((aggregation === 'sum' ? total : total / counts[index]).toFixed(2));
-  });
-}
-
-function buildWeeklyLabels() {
-  const start = parseDateParts(getCurrentWeekBounds().desde);
-  if (!start) return WEEKDAY_LABELS;
+function buildTrailingDays(totalDays = 7, dateInput = getTodayInChileDateInput()) {
+  const start = parseDateParts(getTrailingDaysBounds(totalDays, dateInput).desde);
+  if (!start) return [];
 
   const firstDay = new Date(Date.UTC(start.year, start.month - 1, start.day));
-  return Array.from({ length: 7 }, (_, index) => {
+  return Array.from({ length: totalDays }, (_, index) => {
     const date = new Date(firstDay);
-    date.setUTCDate(date.getUTCDate() + index);
-    return `${WEEKDAY_LABELS[index]} ${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+    date.setUTCDate(firstDay.getUTCDate() + index);
+    const weekdayIndex = (date.getUTCDay() + 6) % 7;
+    return {
+      key: toDateInputFromUTC(date),
+      label: `${WEEKDAY_LABELS[weekdayIndex]} ${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}`,
+    };
   });
 }
+
+function buildDailySeries(rows, days, key, aggregation = 'average') {
+  const totals = new Map(days.map(({ key: day }) => [day, 0]));
+  const counts = new Map(days.map(({ key: day }) => [day, 0]));
+
+  rows.forEach((row) => {
+    const day = getDateInputFromDateTime(row.received_at);
+    const value = scaleWeatherValue(key, row[key]);
+    if (!totals.has(day) || value === null) return;
+
+    totals.set(day, totals.get(day) + value);
+    counts.set(day, counts.get(day) + 1);
+  });
+
+  return days.map(({ key: day }) => {
+    const count = counts.get(day);
+    if (!count) return null;
+    const total = totals.get(day);
+    return Number((aggregation === 'sum' ? total : total / count).toFixed(2));
+  });
+}
+
 
 function formatTooltipValue(value) {
   if (!Number.isFinite(Number(value))) return '--';
@@ -210,6 +214,11 @@ export default function ChartsPanel({ refreshTick = 0, status, liveReading = nul
   const [loadError, setLoadError] = useState('');
   const [lineKey, setLineKey] = useState('Temp');
   const [barKey, setBarKey] = useState('Hum');
+  const [qualityRows, setQualityRows] = useState([]);
+  const dateAnchor = getTodayInChileDateInput();
+  const days = useMemo(() => buildTrailingDays(7, dateAnchor), [dateAnchor]);
+  const qualityDays = useMemo(() => buildTrailingDays(30, dateAnchor), [dateAnchor]);
+  const labels = useMemo(() => days.map(({ label }) => label), [days]);
 
   const loadCharts = useCallback(() => {
     setReloadToken((current) => current + 1);
@@ -223,14 +232,20 @@ export default function ChartsPanel({ refreshTick = 0, status, liveReading = nul
       setLoadError('');
 
       try {
-        const { desde, hasta } = getCurrentWeekBounds();
-        const data = await fetchWeatherRange({ desde, hasta, limit: 5000 });
+        const chartBounds = getTrailingDaysBounds(7);
+        const qualityBounds = getTrailingDaysBounds(30);
+        const [data, historicalData] = await Promise.all([
+          fetchWeatherRange({ ...chartBounds, limit: 5000 }),
+          fetchWeatherRange({ ...qualityBounds, limit: 50000 }).catch(() => null),
+        ]);
         if (!active) return;
         setRows(data);
+        setQualityRows(historicalData || data);
       } catch {
         if (!active) return;
         setRows([]);
-        setLoadError('No se pudieron cargar las lecturas reales de la semana.');
+        setQualityRows([]);
+        setLoadError('No se pudieron cargar las lecturas reales de los últimos 7 días.');
       } finally {
         if (active) setLoading(false);
       }
@@ -246,23 +261,25 @@ export default function ChartsPanel({ refreshTick = 0, status, liveReading = nul
   useEffect(() => {
     if (!liveReading) return;
 
-    setRows((previous) => {
+    const addLiveReading = (previous) => {
       const alreadyPresent = previous.some((row) => (
         (liveReading.id && row.id === liveReading.id)
         || row.received_at === liveReading.received_at
       ));
       return alreadyPresent ? previous : [liveReading, ...previous];
-    });
+    };
+
+    setRows(addLiveReading);
+    setQualityRows(addLiveReading);
   }, [liveReading]);
 
-  const labels = useMemo(() => buildWeeklyLabels(), []);
   const baseChartData = useMemo(() => ({
     labels,
     datasets: [
       {
         type: 'bar',
         label: getSeriesLabel(barKey),
-        data: buildWeeklySeries(rows, barKey, barKey === 'Precip' ? 'sum' : 'average'),
+        data: buildDailySeries(rows, days, barKey, barKey === 'Precip' ? 'sum' : 'average'),
         backgroundColor: getBarColors(barKey).background,
         borderColor: getBarColors(barKey).border,
         borderRadius: 4,
@@ -276,7 +293,7 @@ export default function ChartsPanel({ refreshTick = 0, status, liveReading = nul
       {
         type: 'line',
         label: getSeriesLabel(lineKey),
-        data: buildWeeklySeries(rows, lineKey),
+        data: buildDailySeries(rows, days, lineKey),
         borderColor: VARIABLE_COLORS[lineKey] || COLORS.text,
         backgroundColor: VARIABLE_COLORS[lineKey] || COLORS.text,
         pointBackgroundColor: VARIABLE_COLORS[lineKey] || COLORS.text,
@@ -288,7 +305,7 @@ export default function ChartsPanel({ refreshTick = 0, status, liveReading = nul
         order: 1,
       },
     ],
-  }), [barKey, labels, lineKey, rows]);
+  }), [barKey, days, labels, lineKey, rows]);
   const baseOptions = useMemo(
     () => buildOptions({ leftAxisTitle: getSeriesLabel(lineKey), rightAxisTitle: getSeriesLabel(barKey) }),
     [barKey, lineKey],
@@ -348,12 +365,13 @@ export default function ChartsPanel({ refreshTick = 0, status, liveReading = nul
           {!loading && !loadError && rows.length === 0 && (
             <StatusState
               title="No hay datos disponibles"
-              message="Aún no hay lecturas para esta semana."
+              message="Aún no hay lecturas para los últimos 7 días."
               onRetry={loadCharts}
             />
           )}
           {!loading && !loadError && rows.length > 0 && (
             <div className="trend-stack">
+              <DataQualityCards rows={qualityRows} days={qualityDays} />
               <section className="trend-chart" aria-labelledby="base-chart-title">
                 <h3 id="base-chart-title">{getComparisonQuestion(lineKey, barKey)}</h3>
                 <div className="chart-canvas-shell">
