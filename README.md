@@ -10,7 +10,7 @@ docker compose up -d
 docker compose ps
 ```
 
-El servicio queda ligado por defecto a `127.0.0.1:3000`. En producción debe publicarse mediante el proxy HTTPS existente en la VPS.
+El servicio se publica por defecto en `0.0.0.0:3000`, compatible con acceso directo y con proxies ejecutados en otro contenedor. Si el proxy HTTPS de la VPS se ejecuta directamente en el host, puede limitarse a loopback definiendo `BIND_ADDRESS=127.0.0.1` en `.env`.
 
 Comprobaciones principales:
 

@@ -15,7 +15,7 @@ Públicas de lectura: `/`, assets, `/weather/latest`, `/weather/range`, `/weathe
 
 Bloquear externamente `/health/live`, `/health/ready`, `/weather/raw`, `/weather/raw/db`, `/weather/count`, `/weather/devices` y cualquier ruta futura `/internal/*`. Las rutas diagnósticas están deshabilitadas además por aplicación.
 
-Configurar en el proxy:
+Configurar en el proxy. Si se ejecuta directamente en el host, usar `BIND_ADDRESS=127.0.0.1`; si vive en otro contenedor, usar una red Docker compartida o mantener `BIND_ADDRESS=0.0.0.0` y proteger el puerto con el firewall:
 
 - upstream `127.0.0.1:3000`;
 - WebSocket para `/socket.io`;
