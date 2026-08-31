@@ -12,7 +12,7 @@ import {
   Tooltip,
 } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
-import { fetchWeatherRange } from '../api/weatherApi';
+import { fetchAllWeatherRange } from '../api/weatherApi';
 import DataQualityAlerts from './DataQualityAlerts';
 import DailySummaryTable from './DailySummaryTable';
 import StatusState from './StatusState';
@@ -235,14 +235,14 @@ export default function ChartsPanel({ refreshTick = 0, status, liveReading = nul
 
       try {
         const chartBounds = getTrailingDaysBounds(7);
-        const data = await fetchWeatherRange({ ...chartBounds, limit: 5000 });
+        const data = await fetchAllWeatherRange(chartBounds, { maxRows: 15000 });
         if (!active) return;
         setRows(data);
 
         qualityTimer = window.setTimeout(async () => {
           try {
             const qualityBounds = getTrailingDaysBounds(30);
-            const historicalData = await fetchWeatherRange({ ...qualityBounds, limit: 50000 });
+            const historicalData = await fetchAllWeatherRange(qualityBounds, { maxRows: 50000 });
             if (active) setQualityRows(historicalData);
           } catch {
             if (active) setQualityRows(data);

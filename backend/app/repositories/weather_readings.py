@@ -3,7 +3,7 @@ import os
 import sqlite3
 import threading
 
-from ..config import DB_PATH, PROJECT_ROOT
+from ..config import DB_PATH, PROJECT_ROOT, SQLITE_JOURNAL_MODE
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +15,7 @@ def get_conn():
     ensure_db_ready()
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=10000")
     return conn
 
 
@@ -26,7 +27,7 @@ def init_db():
 
         conn = sqlite3.connect(DB_PATH, timeout=10)
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute(f"PRAGMA journal_mode={SQLITE_JOURNAL_MODE}")
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute(
             """
@@ -84,15 +85,17 @@ def get_db_status():
 
 def save_reading(raw_payload_text, normalized_json=None, received_at=None):
     conn = get_conn()
-    conn.execute(
-        "INSERT INTO weather_readings (received_at, raw_json, normalized_json) VALUES (?, ?, ?)",
-        (received_at, raw_payload_text, normalized_json),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute(
+            "INSERT INTO weather_readings (received_at, raw_json, normalized_json) VALUES (?, ?, ?)",
+            (received_at, raw_payload_text, normalized_json),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
-def build_query(desde=None, hasta=None, device=None, limit=None):
+def build_query(desde=None, hasta=None, device=None, limit=None, offset=0):
     conditions, params = [], []
     if desde:
         conditions.append("received_at >= ?")
@@ -101,15 +104,16 @@ def build_query(desde=None, hasta=None, device=None, limit=None):
         conditions.append("received_at <= ?")
         params.append(f"{hasta} 23:59:59")
     if device:
-        conditions.append("json_extract(raw_json, '$.DeviceID') = ?")
+        conditions.append("json_valid(raw_json) AND json_extract(raw_json, '$.DeviceID') = ?")
         params.append(device)
 
     query = "SELECT id, received_at, raw_json, normalized_json FROM weather_readings"
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
-    query += " ORDER BY received_at DESC"
-    if limit:
-        query += f" LIMIT {limit}"
+    query += " ORDER BY received_at DESC, id DESC"
+    if limit is not None:
+        query += " LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
     return query, params
 
 
@@ -122,8 +126,8 @@ def fetch_latest_reading():
     return row
 
 
-def fetch_range(desde=None, hasta=None, device=None, limit=None):
-    query, params = build_query(desde, hasta, device, limit)
+def fetch_range(desde=None, hasta=None, device=None, limit=None, offset=0):
+    query, params = build_query(desde, hasta, device, limit, offset)
     conn = get_conn()
     rows = conn.execute(query, params).fetchall()
     conn.close()
@@ -156,6 +160,7 @@ def fetch_devices():
             MIN(received_at) AS primer_dato,
             MAX(received_at) AS ultimo_dato
         FROM weather_readings
+        WHERE json_valid(raw_json)
         GROUP BY DeviceID, DeviceType, DeviceVersion
         """
     ).fetchall()
@@ -169,3 +174,11 @@ def fetch_health_stats():
     last = conn.execute("SELECT MAX(received_at) FROM weather_readings").fetchone()[0]
     conn.close()
     return total, last
+
+
+def check_db_connection():
+    conn = get_conn()
+    try:
+        conn.execute("SELECT 1").fetchone()
+    finally:
+        conn.close()

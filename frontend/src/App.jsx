@@ -30,7 +30,7 @@ function getStatusModel({ healthOk, latestTimestamp, serverTimestamp }) {
     return { label: 'Con interrupciones', toneClass: 'is-warning' };
   }
 
-  return { label: 'Online', toneClass: 'is-ok' };
+  return { label: 'En línea', toneClass: 'is-ok' };
 }
 
 function App() {

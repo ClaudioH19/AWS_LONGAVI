@@ -138,8 +138,8 @@ export default function DataTable({ refreshTick = 0, liveReading = null }) {
 
       {error && (
         <StatusState
-          title="Estación fuera de línea"
-          message="No se pudieron cargar los datos históricos."
+          title="No se pudo cargar el histórico"
+          message="El servidor no respondió o los filtros seleccionados no son válidos."
           onRetry={loadTable}
         />
       )}

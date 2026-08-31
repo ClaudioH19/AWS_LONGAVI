@@ -46,7 +46,7 @@ export default function OverviewPanel({ latest, status, loading = false }) {
         <div className="overview-copy">
           <div className="eyebrow">Panel meteorológico</div>
           <h1>Estado actual de la estación</h1>
-          <p>Lecturas en vivo, conmutador de vistas y resumen operativo.</p>
+          <p>Lecturas en vivo, gráficos, histórico y resumen operativo.</p>
         </div>
 
         <div className="health-chips">

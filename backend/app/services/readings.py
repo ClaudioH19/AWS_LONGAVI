@@ -1,9 +1,44 @@
 import json
 import logging
+import math
 
 from .weather_normalizer import normalize_payload
 
 logger = logging.getLogger(__name__)
+WEATHER_KEYS = {"Hum", "Vel", "Dir", "Temp", "Precip", "Rad"}
+METADATA_KEYS = {"DeviceID", "DeviceType", "DeviceVersion", "Timestamp"}
+
+
+def validate_weather_payload(raw):
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError("El payload debe ser un objeto JSON no vacío.")
+
+    normalized = normalize_payload(raw)
+    for key in METADATA_KEYS.intersection(raw):
+        value = raw[key]
+        if value is None:
+            continue
+        if isinstance(value, (dict, list, tuple, bool)):
+            raise ValueError(f"El campo {key} debe ser un valor simple.")
+        if len(str(value)) > 256:
+            raise ValueError(f"El campo {key} supera el largo máximo permitido.")
+
+    present_weather_keys = WEATHER_KEYS.intersection(normalized)
+    if not present_weather_keys:
+        raise ValueError("El payload no contiene variables meteorológicas reconocidas.")
+
+    for key in present_weather_keys:
+        value = normalized[key]
+        if isinstance(value, bool):
+            raise ValueError(f"La variable {key} debe ser numérica.")
+        try:
+            numeric_value = float(value)
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"La variable {key} debe ser numérica.") from error
+        if not math.isfinite(numeric_value):
+            raise ValueError(f"La variable {key} debe ser finita.")
+
+    return normalized
 
 
 def prepare_reading(raw=None, raw_text=None):

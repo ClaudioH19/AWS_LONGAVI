@@ -1,6 +1,6 @@
 import os
 
-from flask import Blueprint, send_from_directory
+from flask import Blueprint, abort, send_from_directory
 
 from ..config import FRONTEND_DIST_DIR
 
@@ -17,4 +17,4 @@ def frontend_files(path):
     file_path = os.path.join(FRONTEND_DIST_DIR, path)
     if os.path.isfile(file_path):
         return send_from_directory(FRONTEND_DIST_DIR, path)
-    return send_from_directory(FRONTEND_DIST_DIR, "index.html")
+    abort(404)
