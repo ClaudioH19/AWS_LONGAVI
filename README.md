@@ -23,6 +23,11 @@ no tiene una base, construye la imagen, ejecuta las pruebas y deja el servicio
 activo. Nunca sobrescribe una base existente. No ejecutar `docker compose down
 -v` en producción.
 
+Para una VPS nueva sin datos históricos, definir
+`INITIALIZE_EMPTY_DATABASE=true` en `.env`; el script creará el esquema SQLite
+vacío. Para restaurar o preservar datos, dejarlo en `false` y copiar antes una
+`weather_data.db` válida.
+
 Si Nginx Proxy Manager corre en Docker en la misma VPS, obtener su red con
 `docker network ls` y definirla en `.env`, por ejemplo
 `PROXY_DOCKER_NETWORK=npm_default`. El despliegue la usa sólo si existe; vacía

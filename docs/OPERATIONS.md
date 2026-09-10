@@ -118,7 +118,13 @@ Para una consulta puntual, usar siempre modo solo lectura: `docker compose exec 
 
 ## Siembra segura y despliegue
 
-El volumen Docker es la fuente de datos en producción. La copia `weather_data.db` del repositorio se usa solamente para el primer despliegue. `ops/deploy.sh` crea el volumen y la copia en él sólo si `/data/weather_data.db` no existe; una base existente no se sobrescribe bajo ninguna circunstancia.
+El volumen Docker es la fuente de datos en producción. La copia
+`weather_data.db` se usa solamente para el primer despliegue. `ops/deploy.sh`
+conserva siempre `/data/weather_data.db` si ya existe; si falta, usa la semilla
+local. En una VPS totalmente nueva se puede definir
+`INITIALIZE_EMPTY_DATABASE=true` para crear una base con el esquema vacío. Esta
+opción no recupera lecturas históricas y no debe usarse como reemplazo de un
+respaldo.
 
 ```sh
 sudo DATA_VOLUME_NAME=aws_longavi_weather-data sh ops/deploy.sh

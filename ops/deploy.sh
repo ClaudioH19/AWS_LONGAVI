@@ -8,6 +8,18 @@ APP_DIR="${BIOVISION_APP_DIR:-$DEFAULT_APP_DIR}"
 SEED_DB="$APP_DIR/weather_data.db"
 cd "$APP_DIR"
 
+INITIALIZE_EMPTY_DB="${INITIALIZE_EMPTY_DATABASE:-}"
+if [ -z "$INITIALIZE_EMPTY_DB" ] && [ -f "$APP_DIR/.env" ]; then
+  INITIALIZE_EMPTY_DB="$(sed -n 's/^INITIALIZE_EMPTY_DATABASE=//p' "$APP_DIR/.env" | tail -n 1)"
+fi
+case "$INITIALIZE_EMPTY_DB" in
+  true|false|'') : ;;
+  *)
+    printf 'INITIALIZE_EMPTY_DATABASE debe ser true o false.\n' >&2
+    exit 2
+    ;;
+esac
+
 PROXY_NETWORK="${PROXY_DOCKER_NETWORK:-}"
 if [ -z "$PROXY_NETWORK" ] && [ -f "$APP_DIR/.env" ]; then
   PROXY_NETWORK="$(sed -n 's/^PROXY_DOCKER_NETWORK=//p' "$APP_DIR/.env" | tail -n 1)"
@@ -35,27 +47,29 @@ if [ ! -f "$APP_DIR/.env" ]; then
   exit 2
 fi
 
-if [ ! -f "$SEED_DB" ]; then
-  printf 'No existe la semilla requerida: %s\n' "$SEED_DB" >&2
-  exit 2
-fi
-
 docker compose build weather-server
 docker compose run --rm --no-deps --entrypoint python weather-server -m unittest discover -s backend/tests -v
 
-# La condición se evalúa dentro del volumen. Una DB ya existente jamás se
-# reemplaza, incluso si la semilla local es más nueva.
-docker compose run --rm --no-deps \
-  -v "$SEED_DB:/seed/weather_data.db:ro" \
-  --entrypoint sh weather-server -ceu '
-    if [ -e /data/weather_data.db ]; then
-      echo "Base existente detectada: se conserva sin cambios."
-      exit 0
-    fi
-    cp /seed/weather_data.db /data/weather_data.db
-    chown 10001:10001 /data/weather_data.db
-    echo "Base inicial sembrada en el volumen."
-  '
+# La DB del volumen siempre prevalece. La semilla sólo se copia en el primer
+# despliegue; una DB vacía sólo se crea con autorización explícita.
+if docker compose run --rm --no-deps --entrypoint sh weather-server -ceu '[ -e /data/weather_data.db ]'; then
+  printf 'Base existente detectada en el volumen: se conserva sin cambios.\n'
+elif [ -f "$SEED_DB" ]; then
+  docker compose run --rm --no-deps \
+    -v "$SEED_DB:/seed/weather_data.db:ro" \
+    --entrypoint sh weather-server -ceu '
+      cp /seed/weather_data.db /data/weather_data.db
+      chown 10001:10001 /data/weather_data.db
+      echo "Base inicial sembrada en el volumen."
+    '
+elif [ "$INITIALIZE_EMPTY_DB" = true ]; then
+  docker compose run --rm --no-deps --entrypoint python weather-server -c \
+    'from backend.app.repositories.weather_readings import init_db; init_db(); print("Base vacía inicializada.")'
+else
+  printf 'No existe weather_data.db ni una DB en el volumen.\n' >&2
+  printf 'Copie una base existente o defina INITIALIZE_EMPTY_DATABASE=true sólo para una VPS nueva.\n' >&2
+  exit 2
+fi
 
 docker compose run --rm --no-deps --entrypoint python weather-server -c \
   'import sqlite3,sys; c=sqlite3.connect("file:/data/weather_data.db?mode=ro", uri=True); r=c.execute("PRAGMA integrity_check").fetchone()[0]; print("DB integrity:", r); sys.exit(0 if r == "ok" else 1)'
