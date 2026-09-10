@@ -9,7 +9,7 @@ User=root
 Environment=BIOVISION_APP_DIR=/opt/biovision/current
 Environment=BIOVISION_HEALTH_URL=http://127.0.0.1:3000/health/live
 Environment=BIOVISION_WATCHDOG_STATE_DIR=/var/lib/biovision-watchdog
-ExecStart=/bin/sh /opt/biovision/current/ops/watchdog.sh
+ExecStart=/bin/sh -c 'exec "$${BIOVISION_APP_DIR}/ops/watchdog.sh"'
 StateDirectory=biovision-watchdog
 NoNewPrivileges=true
 PrivateTmp=true

@@ -1,7 +1,9 @@
 #!/bin/sh
 set -eu
 
-APP_DIR="${BIOVISION_APP_DIR:-/opt/biovision/current}"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+DEFAULT_APP_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+APP_DIR="${BIOVISION_APP_DIR:-$DEFAULT_APP_DIR}"
 BACKUP_DIR="${BIOVISION_BACKUP_DIR:-/srv/biovision/backups}"
 RETENTION_COUNT="${BIOVISION_BACKUP_RETENTION_COUNT:-7}"
 backup_day="$(date -u +%Y%m%d)"

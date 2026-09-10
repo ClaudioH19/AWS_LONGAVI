@@ -1,7 +1,9 @@
 #!/bin/sh
 set -eu
 
-APP_DIR="${BIOVISION_APP_DIR:-/opt/biovision/current}"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+DEFAULT_APP_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+APP_DIR="${BIOVISION_APP_DIR:-$DEFAULT_APP_DIR}"
 HEALTH_URL="${BIOVISION_HEALTH_URL:-http://127.0.0.1:3000/health/live}"
 STATE_DIR="${BIOVISION_WATCHDOG_STATE_DIR:-/var/lib/biovision-watchdog}"
 FAILURES_BEFORE_RESTART="${BIOVISION_FAILURES_BEFORE_RESTART:-3}"

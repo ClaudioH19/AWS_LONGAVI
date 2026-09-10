@@ -14,13 +14,21 @@ adelante se dispone de una IP pública estable.
 cp .env.example .env
 chmod 600 .env
 # editar .env y ajustar recursos/red si corresponde
-sudo BIOVISION_APP_DIR=/opt/biovision/current sh ops/deploy.sh
+sudo sh ops/deploy.sh
 ```
 
-`ops/deploy.sh` crea el volumen, copia `weather_data.db` sólo si el volumen aún
+`ops/deploy.sh` detecta automáticamente la raíz del repositorio, crea el
+volumen, copia `weather_data.db` sólo si el volumen aún
 no tiene una base, construye la imagen, ejecuta las pruebas y deja el servicio
 activo. Nunca sobrescribe una base existente. No ejecutar `docker compose down
 -v` en producción.
+
+Si Nginx Proxy Manager corre en Docker en la misma VPS, obtener su red con
+`docker network ls` y definirla en `.env`, por ejemplo
+`PROXY_DOCKER_NETWORK=npm_default`. El despliegue la usa sólo si existe; vacía
+o inexistente no interrumpe el despliegue y conserva la red Docker interna. No
+se requiere un segundo archivo Compose: el script conecta el contenedor ya
+levantado a la red externa cuando corresponde.
 
 ## Desarrollo y verificación
 

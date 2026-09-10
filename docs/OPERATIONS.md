@@ -36,6 +36,15 @@ Bloquear externamente `/health/live`, `/health/ready`, `/weather/raw`, `/weather
 
 Configurar en el proxy. Si se ejecuta directamente en el host, usar `BIND_ADDRESS=127.0.0.1`; si vive en otro contenedor, usar una red Docker compartida o mantener `BIND_ADDRESS=0.0.0.0` y proteger el puerto con el firewall:
 
+Para Nginx Proxy Manager en Docker, definir opcionalmente
+`PROXY_DOCKER_NETWORK` en `.env` con el nombre mostrado por `docker network
+ls`. `ops/deploy.sh` valida que exista y conecta el contenedor
+`weather-server` a ella después de levantarlo; si no existe o queda vacía,
+funciona con la red interna sin requerir cambios ni otro archivo Compose. En
+NPM, usar `weather-server` como host de destino y `3000` como puerto sólo
+cuando la red externa se haya conectado. De otro modo, si NPM corre en el host,
+usar `127.0.0.1:3000`.
+
 - upstream `127.0.0.1:3000`;
 - WebSocket para `/socket.io`;
 - cuerpo máximo de 64 KiB en `POST /weather`;
@@ -75,9 +84,7 @@ El watchdog nunca debe reiniciar por `status/station=stale`. Tampoco debe repeti
 El volumen tiene el nombre estable `aws_longavi_weather-data` por defecto. `DATA_VOLUME_NAME` permite cambiarlo de forma explícita, pero no debe modificarse durante una actualización ordinaria: otro nombre conecta un volumen distinto y la aplicación parecerá no tener datos.
 
 ```sh
-sudo BIOVISION_APP_DIR=/opt/biovision/current \
-  BIOVISION_BACKUP_DIR=/srv/biovision/backups \
-  sh /opt/biovision/current/ops/backup.sh
+sudo BIOVISION_BACKUP_DIR=/srv/biovision/backups sh ops/backup.sh
 ```
 
 Programar un backup diario, copiarlo fuera de la VPS y probar restauración periódicamente. El script mantiene una copia verificada por día UTC y conserva los siete días más recientes (configurable con `BIOVISION_BACKUP_RETENTION_COUNT`, nunca menor a 7), junto a sus checksums; una ejecución repetida el mismo día reemplaza atómicamente sólo esa copia diaria. Mantener además una copia externa de la VPS.
@@ -92,8 +99,10 @@ sudo systemctl enable --now biovision-backup.timer
 sudo systemctl list-timers biovision-backup.timer
 ```
 
-Si la aplicación o los respaldos están en otra ruta, crear un override del
-servicio para `BIOVISION_APP_DIR` y `BIOVISION_BACKUP_DIR`.
+Los scripts detectan la raíz del repositorio al ejecutarse desde cualquier
+ubicación. Para systemd, si la aplicación o los respaldos están en otra ruta,
+crear un override del servicio para `BIOVISION_APP_DIR` y
+`BIOVISION_BACKUP_DIR`.
 
 Antes de restaurar: detener ingreso, conservar una copia del volumen actual, verificar el checksum y probar `PRAGMA integrity_check`. No sobrescribir la base activa mientras el contenedor está escribiendo.
 
@@ -112,9 +121,7 @@ Para una consulta puntual, usar siempre modo solo lectura: `docker compose exec 
 El volumen Docker es la fuente de datos en producción. La copia `weather_data.db` del repositorio se usa solamente para el primer despliegue. `ops/deploy.sh` crea el volumen y la copia en él sólo si `/data/weather_data.db` no existe; una base existente no se sobrescribe bajo ninguna circunstancia.
 
 ```sh
-sudo BIOVISION_APP_DIR=/opt/biovision/current \
-  DATA_VOLUME_NAME=aws_longavi_weather-data \
-  sh /opt/biovision/current/ops/deploy.sh
+sudo DATA_VOLUME_NAME=aws_longavi_weather-data sh ops/deploy.sh
 ```
 
 El script construye, ejecuta los tests y recrea sólo `weather-server`. Definir `DATA_VOLUME_NAME` si se cambió del nombre por defecto. Antes de actualizar, ejecutar un backup verificado.

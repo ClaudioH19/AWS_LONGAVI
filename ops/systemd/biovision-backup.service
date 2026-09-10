@@ -8,8 +8,7 @@ Type=oneshot
 Environment=BIOVISION_APP_DIR=/opt/biovision/current
 Environment=BIOVISION_BACKUP_DIR=/srv/biovision/backups
 Environment=BIOVISION_BACKUP_RETENTION_COUNT=7
-ExecStart=/bin/sh /opt/biovision/current/ops/backup.sh
+ExecStart=/bin/sh -c 'exec "$${BIOVISION_APP_DIR}/ops/backup.sh"'
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
-

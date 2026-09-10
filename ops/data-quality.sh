@@ -2,7 +2,9 @@
 # Informe de solo lectura para ejecutar por un administrador de la VPS.
 set -eu
 
-APP_DIR="${BIOVISION_APP_DIR:-/opt/biovision/current}"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+DEFAULT_APP_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+APP_DIR="${BIOVISION_APP_DIR:-$DEFAULT_APP_DIR}"
 cd "$APP_DIR"
 
 docker compose exec -T --user appuser weather-server sqlite3 -readonly /data/weather_data.db <<'SQL'
