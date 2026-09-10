@@ -13,6 +13,12 @@ Públicas de lectura: `/`, assets, `/weather/latest`, `/weather/range`, `/weathe
 
 `POST /weather` debe restringirse por IP de origen. Si esto no es posible, definir `INGEST_API_KEY` y enviar el mismo valor en `X-Weather-Key` desde la estación.
 
+En producción, usar ambas barreras. Nunca publicar esta clave en el frontend ni confirmarla en logs. La ingesta acepta únicamente `Content-Type: application/json` y el contrato fijo de estación: canales `""`, `ch0` a `ch4` (todos numéricos) y, opcionalmente, `DeviceID`, `DeviceType`, `DeviceVersion` y `Timestamp`. Se rechazan campos extra, JSON duplicado, arreglos/objetos, valores no finitos, texto no numérico y contenido que intente usar el endpoint como subida de archivos o scripts. El payload original aceptado se conserva sin transformarlo en `raw_json`.
+
+La CSP mantiene scripts exclusivamente en el mismo origen. `style-src` permite
+estilos inline porque Boneyard calcula en ejecución la geometría responsive de
+sus esqueletos; no se permite código inline ni orígenes externos.
+
 Bloquear externamente `/health/live`, `/health/ready`, `/weather/raw`, `/weather/raw/db`, `/weather/count`, `/weather/devices` y cualquier ruta futura `/internal/*`. Las rutas diagnósticas están deshabilitadas además por aplicación.
 
 Configurar en el proxy. Si se ejecuta directamente en el host, usar `BIND_ADDRESS=127.0.0.1`; si vive en otro contenedor, usar una red Docker compartida o mantener `BIND_ADDRESS=0.0.0.0` y proteger el puerto con el firewall:
@@ -61,9 +67,44 @@ sudo BIOVISION_APP_DIR=/opt/biovision/current \
   sh /opt/biovision/current/ops/backup.sh
 ```
 
-Programar un backup diario, copiarlo fuera de la VPS y probar restauración periódicamente. El script no elimina backups antiguos: la retención debe definirse explícitamente en el almacenamiento externo.
+Programar un backup diario, copiarlo fuera de la VPS y probar restauración periódicamente. El script mantiene una copia verificada por día UTC y conserva los siete días más recientes (configurable con `BIOVISION_BACKUP_RETENTION_COUNT`, nunca menor a 7), junto a sus checksums; una ejecución repetida el mismo día reemplaza atómicamente sólo esa copia diaria. Mantener además una copia externa de la VPS.
+
+Instalación del timer diario incluido:
+
+```sh
+sudo install -m 0644 ops/systemd/biovision-backup.service /etc/systemd/system/
+sudo install -m 0644 ops/systemd/biovision-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now biovision-backup.timer
+sudo systemctl list-timers biovision-backup.timer
+```
+
+Si la aplicación o los respaldos están en otra ruta, crear un override del
+servicio para `BIOVISION_APP_DIR` y `BIOVISION_BACKUP_DIR`.
 
 Antes de restaurar: detener ingreso, conservar una copia del volumen actual, verificar el checksum y probar `PRAGMA integrity_check`. No sobrescribir la base activa mientras el contenedor está escribiendo.
+
+## Calidad y consulta administrativa
+
+La política mínima es: validar el contrato antes de persistir, no modificar lecturas históricas desde la aplicación, ejecutar comprobación de integridad y conteos diariamente, y revisar el informe cuando existan canales faltantes, JSON malformado o una brecha inesperada de lecturas. El administrador puede ejecutar el informe estrictamente de solo lectura:
+
+```sh
+sudo BIOVISION_APP_DIR=/opt/biovision/current sh /opt/biovision/current/ops/data-quality.sh
+```
+
+Para una consulta puntual, usar siempre modo solo lectura: `docker compose exec -T --user appuser weather-server sqlite3 -readonly /data/weather_data.db`. Antes de una restauración, detener la ingesta, respaldar el volumen actual y verificar `PRAGMA integrity_check`; nunca reemplazar la base activa mientras recibe lecturas.
+
+## Siembra segura y despliegue
+
+El volumen Docker es la fuente de datos en producción. La copia `weather_data.db` del repositorio se usa solamente para el primer despliegue. `ops/deploy.sh` crea el volumen y la copia en él sólo si `/data/weather_data.db` no existe; una base existente no se sobrescribe bajo ninguna circunstancia.
+
+```sh
+sudo BIOVISION_APP_DIR=/opt/biovision/current \
+  DATA_VOLUME_NAME=aws_longavi_weather-data \
+  sh /opt/biovision/current/ops/deploy.sh
+```
+
+El script construye, ejecuta los tests y recrea sólo `weather-server`. Definir `DATA_VOLUME_NAME` si se cambió del nombre por defecto. Antes de actualizar, ejecutar un backup verificado.
 
 ## Alertas mínimas
 

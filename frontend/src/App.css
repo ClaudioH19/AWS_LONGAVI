@@ -1,4 +1,8 @@
+@import "tailwindcss";
+
 :root {
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  color-scheme: light;
   --bg: #f8fafc;
   --surface: #fafafa;
   --surface-strong: #fafafa;
@@ -14,8 +18,33 @@
   --shadow: 0 4px 14px rgba(2, 46, 35, 0.07);
 }
 
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-width: 320px;
+  background: var(--bg);
+}
+
 * {
   box-sizing: border-box;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(4, 119, 86, 0.4);
+  outline-offset: 2px;
 }
 
 .app-shell {
@@ -1000,5 +1029,86 @@ td.device {
     width: 100%;
     display: grid;
     grid-template-columns: 1fr 1fr;
+  }
+
+  .panel {
+    padding: 0.7rem;
+  }
+
+  .nav-status {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .nav-time {
+    font-size: 0.72rem;
+  }
+
+  .panel-toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panel-toolbar label {
+    min-width: 0;
+  }
+
+  .panel-toolbar input,
+  .panel-toolbar select,
+  .panel-toolbar button {
+    width: 100%;
+    min-height: 42px;
+  }
+
+  .chart-canvas-shell {
+    height: 270px;
+    padding: 0.25rem;
+  }
+
+  .quality-alerts {
+    right: 0.4rem;
+  }
+}
+
+/* Pantallas de operación/TV: densidad legible a distancia sin limitar el panel. */
+@media (min-width: 1800px) {
+  :root {
+    font-size: 18px;
+  }
+
+  .dashboard-section {
+    max-width: 2160px;
+    padding: 1.25rem 2rem 2rem;
+  }
+
+  .top-nav {
+    padding: 1rem 2rem;
+  }
+
+  .summary-grid {
+    gap: 0.9rem;
+  }
+
+  .panel {
+    padding: 1rem;
+  }
+
+  .chart-canvas-shell {
+    height: 440px;
+  }
+
+  .table-wrap {
+    max-height: 650px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

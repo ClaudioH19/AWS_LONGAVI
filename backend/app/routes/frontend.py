@@ -1,6 +1,4 @@
-import os
-
-from flask import Blueprint, abort, send_from_directory
+from flask import Blueprint, send_from_directory
 
 from ..config import FRONTEND_DIST_DIR
 
@@ -14,7 +12,5 @@ def dashboard():
 
 @bp.route("/<path:path>")
 def frontend_files(path):
-    file_path = os.path.join(FRONTEND_DIST_DIR, path)
-    if os.path.isfile(file_path):
-        return send_from_directory(FRONTEND_DIST_DIR, path)
-    abort(404)
+    # send_from_directory usa safe_join y rechaza traversal fuera del dist.
+    return send_from_directory(FRONTEND_DIST_DIR, path)

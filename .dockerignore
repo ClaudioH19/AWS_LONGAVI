@@ -4,6 +4,12 @@ __pycache__/
 *.pyo
 *.pyd
 *.log
+.venv/
+
+# Datos persistentes: nunca deben entrar al contexto ni a las capas de imagen
+*.db
+*.db-wal
+*.db-shm
 
 # Git and editor
 .git/

@@ -1,0 +1,11 @@
+[Unit]
+Description=Backup diario de BioVision
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=15m
+Unit=biovision-backup.service
+
+[Install]
+WantedBy=timers.target

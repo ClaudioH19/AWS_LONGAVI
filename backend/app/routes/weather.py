@@ -128,6 +128,8 @@ def receive_weather():
             return jsonify({"error": "unauthorized", "message": "Credencial de estación inválida."}), 401
 
     try:
+        if request.mimetype != "application/json":
+            raise ValueError("Content-Type debe ser application/json.")
         raw_text = request.get_data(as_text=True)
         raw = _parse_json_object(raw_text)
 

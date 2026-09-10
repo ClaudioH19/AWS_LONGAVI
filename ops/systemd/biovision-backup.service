@@ -1,0 +1,15 @@
+[Unit]
+Description=Backup SQLite verificado de BioVision
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=BIOVISION_APP_DIR=/opt/biovision/current
+Environment=BIOVISION_BACKUP_DIR=/srv/biovision/backups
+Environment=BIOVISION_BACKUP_RETENTION_COUNT=7
+ExecStart=/bin/sh /opt/biovision/current/ops/backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+

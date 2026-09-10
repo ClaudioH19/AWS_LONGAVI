@@ -1,4 +1,5 @@
 import { formatDateTime } from '../utils/dateTime';
+import { Skeleton } from 'boneyard-js/react';
 import {
   WEATHER_FIXED_KEYS,
   formatWeatherValue,
@@ -10,23 +11,36 @@ import { getAgronomicTone } from '../config/agronomicThresholds';
 
 function SummaryCard({ weatherKey, value, updatedAt, loading }) {
   const tone = getAgronomicTone(weatherKey, scaleWeatherValue(weatherKey, value));
+  const loadingFallback = (
+    <>
+      <span className="skeleton skeleton-value" />
+      <span className="skeleton skeleton-line" />
+    </>
+  );
 
   return (
     <article className={`summary-card is-${tone}`}>
       <span className="summary-label">{getVariableDisplayName(weatherKey)}</span>
-      {loading ? (
-        <>
-          <span className="skeleton skeleton-value" />
-          <span className="skeleton skeleton-line" />
-        </>
-      ) : (
+      <Skeleton
+        name={`weather-summary-${weatherKey}`}
+        loading={loading}
+        animate="shimmer"
+        transition={200}
+        fallback={loadingFallback}
+        fixture={(
+          <>
+            <strong className="summary-value">18.2</strong>
+            <span className="summary-meta">Actualizado: 01/01/2026 12:00</span>
+          </>
+        )}
+      >
         <>
           <strong className="summary-value">{formatWeatherValue(weatherKey, value)}</strong>
           <span className="summary-meta">
             {updatedAt ? `Actualizado: ${formatDateTime(updatedAt)}` : 'Sin lectura reciente'}
           </span>
         </>
-      )}
+      </Skeleton>
     </article>
   );
 }
@@ -58,24 +72,19 @@ export default function OverviewPanel({ latest, status, loading = false }) {
         </div>
       </article>
 
-      {loading ? (
-        <div className="summary-grid">
-          {WEATHER_FIXED_KEYS.map((key) => (
-            <SummaryCard key={key} weatherKey={key} loading />
-          ))}
-        </div>
-      ) : hasRecentReading ? (
-        <div className="summary-grid">
-          {WEATHER_FIXED_KEYS.map((key) => (
-            <SummaryCard
-              key={key}
-              weatherKey={key}
-              value={latest?.[key]}
-              updatedAt={readingTime}
-            />
-          ))}
-        </div>
-      ) : (
+      <div className="summary-grid">
+        {WEATHER_FIXED_KEYS.map((key) => (
+          <SummaryCard
+            key={key}
+            weatherKey={key}
+            value={latest?.[key]}
+            updatedAt={readingTime}
+            loading={loading}
+          />
+        ))}
+      </div>
+
+      {!loading && !hasRecentReading && (
         <StatusState
           title="Estado de la estación"
           message="Sin lectura reciente. Revisa la conexión y vuelve a intentarlo."

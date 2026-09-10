@@ -1,16 +1,14 @@
 import logging
-import os
 import sys
 import uuid
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
-from flask import Flask, g, jsonify, request, send_from_directory
+from flask import Flask, g, jsonify, request
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .config import (
     DB_PATH,
-    FRONTEND_DIST_DIR,
     LOG_FILE,
     LOG_LEVEL,
     MAX_CONTENT_LENGTH,
@@ -62,7 +60,7 @@ def create_app():
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; "
-            "img-src 'self' data:; style-src 'self'; script-src 'self'; "
+            "img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; "
             "connect-src 'self' ws: wss:"
         )
         if request.path.startswith(("/health", "/status")):
@@ -74,11 +72,6 @@ def create_app():
         api_prefixes = ("/weather", "/health", "/status", "/internal")
         if request.path.startswith(api_prefixes):
             return jsonify({"error": "not_found", "message": "La ruta solicitada no existe."}), 404
-        not_found_path = os.path.join(FRONTEND_DIST_DIR, "404.html")
-        if os.path.isfile(not_found_path):
-            response = send_from_directory(FRONTEND_DIST_DIR, "404.html")
-            response.status_code = 404
-            return response
         return "Página no encontrada", 404
 
     @app.errorhandler(405)

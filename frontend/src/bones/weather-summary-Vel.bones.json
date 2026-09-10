@@ -1,0 +1,93 @@
+{
+  "breakpoints": {
+    "375": {
+      "name": "weather-summary-Vel",
+      "viewportWidth": 323,
+      "width": 323,
+      "height": 24,
+      "bones": [
+        [
+          0,
+          -4,
+          12.3478,
+          27,
+          8
+        ],
+        [
+          12.3478,
+          6,
+          47.6232,
+          15,
+          8
+        ]
+      ]
+    },
+    "768": {
+      "name": "weather-summary-Vel",
+      "viewportWidth": 216,
+      "width": 216,
+      "height": 24,
+      "bones": [
+        [
+          0,
+          -4,
+          18.5204,
+          27,
+          8
+        ],
+        [
+          18.5204,
+          6,
+          71.4296,
+          15,
+          8
+        ]
+      ]
+    },
+    "1280": {
+      "name": "weather-summary-Vel",
+      "viewportWidth": 176,
+      "width": 176,
+      "height": 48,
+      "bones": [
+        [
+          0,
+          -4,
+          23.2106,
+          27,
+          8
+        ],
+        [
+          0,
+          6,
+          93.3304,
+          39,
+          8
+        ]
+      ]
+    },
+    "1920": {
+      "name": "weather-summary-Vel",
+      "viewportWidth": 267,
+      "width": 267,
+      "height": 34,
+      "bones": [
+        [
+          0,
+          -6,
+          22.9483,
+          41,
+          8
+        ],
+        [
+          22.9483,
+          13,
+          64.8235,
+          17,
+          8
+        ]
+      ]
+    }
+  },
+  "_hash": "e4b62a54744ec1ca9af8b33022e464ed"
+}

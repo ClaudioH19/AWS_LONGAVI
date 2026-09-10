@@ -25,8 +25,6 @@ COPY requirements.txt requirements.lock ./
 RUN pip install --no-cache-dir -r requirements.lock
 
 COPY backend ./backend
-COPY weather_server.py .
-COPY payload.js .
 COPY entrypoint.sh .
 COPY --from=frontend-builder /frontend/dist ./frontend_dist
 RUN chmod +x entrypoint.sh

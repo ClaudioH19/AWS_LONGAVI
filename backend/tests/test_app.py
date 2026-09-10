@@ -46,10 +46,19 @@ class WeatherApplicationTests(unittest.TestCase):
             "{bad",
             '{"ch0": 10, "ch0": 20}',
             '{"DeviceID": {"unexpected": true}, "ch0": 10}',
+            json.dumps({**VALID_PAYLOAD, "upload": "<script>alert(1)</script>"}),
+            json.dumps({key: value for key, value in VALID_PAYLOAD.items() if key != "ch4"}),
+            json.dumps({**VALID_PAYLOAD, "DeviceID": "<script>alert(1)</script>"}),
+            json.dumps({**VALID_PAYLOAD, "DeviceID": "=HYPERLINK(\"https://invalid\")"}),
         )
         for payload in invalid_payloads:
             response = self.client.post("/weather", data=payload, content_type="application/json")
             self.assertEqual(response.status_code, 400, payload)
+        self.assertEqual(self.client.get("/health").get_json()["db_total_registros"], 0)
+
+    def test_02b_ingestion_requires_json_content_type(self):
+        response = self.client.post("/weather", data=json.dumps(VALID_PAYLOAD), content_type="text/plain")
+        self.assertEqual(response.status_code, 400)
         self.assertEqual(self.client.get("/health").get_json()["db_total_registros"], 0)
 
     def test_03_valid_payload_is_persisted(self):
@@ -90,7 +99,11 @@ class WeatherApplicationTests(unittest.TestCase):
         response = self.client.get("/health/live", headers={"X-Request-ID": "test-request"})
         self.assertEqual(response.headers["X-Request-ID"], "test-request")
         self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
-        self.assertIn("frame-ancestors 'none'", response.headers["Content-Security-Policy"])
+        csp = response.headers["Content-Security-Policy"]
+        self.assertIn("frame-ancestors 'none'", csp)
+        self.assertIn("style-src 'self' 'unsafe-inline'", csp)
+        self.assertIn("script-src 'self'", csp)
+        self.assertNotIn("script-src 'self' 'unsafe-inline'", csp)
 
     def test_09_realtime_event_works_without_external_message_queue(self):
         realtime_client = socketio.test_client(app, flask_test_client=self.client)

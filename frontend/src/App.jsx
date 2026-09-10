@@ -5,7 +5,6 @@ import DataTable from './components/DataTable';
 import OverviewPanel from './components/OverviewPanel';
 import { fetchHealth, fetchLatest } from './api/weatherApi';
 import { formatDateTime, parseDateTimeAsLocal } from './utils/dateTime';
-import './App.css';
 
 const HEALTH_POLL_INTERVAL_MS = 60000;
 const RANGE_RECONCILE_EVERY_POLLS = 5;
@@ -140,7 +139,7 @@ function App() {
   );
 
   return (
-    <div className="app-shell">
+    <div className="app-shell min-h-screen">
       <header className="top-nav">
         <div className="brand">
           BIOVISION
