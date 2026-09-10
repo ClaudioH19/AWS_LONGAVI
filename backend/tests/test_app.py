@@ -11,6 +11,7 @@ os.environ["DRAGONFLY_URL"] = ""
 os.environ["ENABLE_DIAGNOSTIC_ROUTES"] = "false"
 os.environ["MIN_FREE_DISK_BYTES"] = "0"
 os.environ["TRUST_PROXY_COUNT"] = "0"
+os.environ["INGEST_ALLOWED_IPS"] = ""
 
 from backend.app.main import app  # noqa: E402
 from backend.app.realtime import socketio  # noqa: E402
@@ -60,6 +61,23 @@ class WeatherApplicationTests(unittest.TestCase):
         response = self.client.post("/weather", data=json.dumps(VALID_PAYLOAD), content_type="text/plain")
         self.assertEqual(response.status_code, 400)
         self.assertEqual(self.client.get("/health").get_json()["db_total_registros"], 0)
+
+    def test_02c_ingestion_rejects_sources_outside_the_allowlist(self):
+        import backend.app.routes.weather as weather_routes
+        from ipaddress import ip_network
+
+        original_networks = weather_routes.INGEST_ALLOWED_NETWORKS
+        weather_routes.INGEST_ALLOWED_NETWORKS = (ip_network("203.0.113.10/32"),)
+        try:
+            response = self.client.post(
+                "/weather",
+                data=json.dumps(VALID_PAYLOAD),
+                content_type="application/json",
+                environ_base={"REMOTE_ADDR": "198.51.100.20"},
+            )
+            self.assertEqual(response.status_code, 403)
+        finally:
+            weather_routes.INGEST_ALLOWED_NETWORKS = original_networks
 
     def test_03_valid_payload_is_persisted(self):
         response = self.client.post(

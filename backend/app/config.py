@@ -1,4 +1,5 @@
 import os
+from ipaddress import ip_network
 from zoneinfo import ZoneInfo
 
 
@@ -38,7 +39,16 @@ MAX_RANGE_OFFSET = _env_int("MAX_RANGE_OFFSET", 1_000_000, 0)
 STATION_STALE_AFTER_SECONDS = _env_int("STATION_STALE_AFTER_SECONDS", 3 * 60 * 60, 60)
 MIN_FREE_DISK_BYTES = _env_int("MIN_FREE_DISK_BYTES", 128 * 1024 * 1024, 0)
 ENABLE_DIAGNOSTIC_ROUTES = _env_bool("ENABLE_DIAGNOSTIC_ROUTES", False)
-INGEST_API_KEY = os.environ.get("INGEST_API_KEY", "")
+def _env_networks(name):
+    values = tuple(value.strip() for value in os.environ.get(name, "").split(",") if value.strip())
+    try:
+        return tuple(ip_network(value, strict=False) for value in values)
+    except ValueError as error:
+        raise RuntimeError(f"{name} debe contener direcciones IP o rangos CIDR válidos.") from error
+
+
+# La estación no admite credenciales HTTP: se autoriza por IP de origen.
+INGEST_ALLOWED_NETWORKS = _env_networks("INGEST_ALLOWED_IPS")
 TRUST_PROXY_COUNT = _env_int("TRUST_PROXY_COUNT", 1, 0, 4)
 
 SQLITE_JOURNAL_MODE = os.environ.get("SQLITE_JOURNAL_MODE", "DELETE").strip().upper()

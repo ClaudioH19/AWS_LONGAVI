@@ -25,7 +25,7 @@ services:
       SQLITE_JOURNAL_MODE: ${SQLITE_JOURNAL_MODE:-DELETE}
       TRUST_PROXY_COUNT: ${TRUST_PROXY_COUNT:-1}
       ENABLE_DIAGNOSTIC_ROUTES: ${ENABLE_DIAGNOSTIC_ROUTES:-false}
-      INGEST_API_KEY: ${INGEST_API_KEY:-}
+      INGEST_ALLOWED_IPS: ${INGEST_ALLOWED_IPS:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/health/live', timeout=3)"]
       interval: 30s

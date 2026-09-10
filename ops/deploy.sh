@@ -11,14 +11,6 @@ if [ ! -f "$APP_DIR/.env" ]; then
   exit 2
 fi
 
-if ! grep -Eq '^INGEST_API_KEY=.{32,}$' "$APP_DIR/.env"; then
-  if [ "${ALLOW_EMPTY_INGEST_API_KEY:-false}" != "true" ]; then
-    printf 'INGEST_API_KEY debe tener al menos 32 caracteres. Genere: openssl rand -hex 32\n' >&2
-    printf 'Sólo si un proxy restringe POST /weather por IP, reintente con ALLOW_EMPTY_INGEST_API_KEY=true.\n' >&2
-    exit 2
-  fi
-fi
-
 if [ ! -f "$SEED_DB" ]; then
   printf 'No existe la semilla requerida: %s\n' "$SEED_DB" >&2
   exit 2

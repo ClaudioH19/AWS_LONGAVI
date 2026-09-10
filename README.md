@@ -6,14 +6,14 @@ Panel público de monitoreo para una estación meteorológica. El backend Flask 
 
 La base real `weather_data.db` se conserva en la raíz como semilla del primer
 despliegue. No la renombres ni la sustituyas. Copia `.env.example` a `.env`,
-ajusta recursos y configura una credencial de ingesta larga en
-`INGEST_API_KEY` (por ejemplo con `openssl rand -hex 32`). La estación debe
-enviar ese mismo secreto en `X-Weather-Key`; esto no cambia su payload JSON.
+ajusta recursos. La estación puede enviar su payload JSON sin modificarlo ni
+agregar encabezados. `INGEST_ALLOWED_IPS` es opcional y sólo se usa si más
+adelante se dispone de una IP pública estable.
 
 ```sh
 cp .env.example .env
 chmod 600 .env
-# editar .env y definir INGEST_API_KEY
+# editar .env y ajustar recursos/red si corresponde
 sudo BIOVISION_APP_DIR=/opt/biovision/current sh ops/deploy.sh
 ```
 

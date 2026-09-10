@@ -11,9 +11,22 @@
 
 Públicas de lectura: `/`, assets, `/weather/latest`, `/weather/range`, `/weather/export/csv`, `/weather/export/json`, `/health`, `/status/station` y `/socket.io`.
 
-`POST /weather` debe restringirse por IP de origen. Si esto no es posible, definir `INGEST_API_KEY` y enviar el mismo valor en `X-Weather-Key` desde la estación.
+La estación no necesita agregar credenciales ni modificar su payload. Si en el
+futuro dispone de una IP pública estable, se puede habilitar la capa adicional
+`INGEST_ALLOWED_IPS` con una IP o CIDR, por ejemplo
+`INGEST_ALLOWED_IPS=203.0.113.42/32`. Dejarla vacía permite estaciones con IP
+dinámica.
 
-En producción, usar ambas barreras. Nunca publicar esta clave en el frontend ni confirmarla en logs. La ingesta acepta únicamente `Content-Type: application/json` y el contrato fijo de estación: canales `""`, `ch0` a `ch4` (todos numéricos) y, opcionalmente, `DeviceID`, `DeviceType`, `DeviceVersion` y `Timestamp`. Se rechazan campos extra, JSON duplicado, arreglos/objetos, valores no finitos, texto no numérico y contenido que intente usar el endpoint como subida de archivos o scripts. El payload original aceptado se conserva sin transformarlo en `raw_json`.
+Cuando no hay IP estable ni credencial posible, no se puede autenticar el
+origen del POST: un tercero podría imitar el JSON. En ese caso el proxy debe
+aplicar límite de tasa específico a `POST /weather`, cuerpo máximo de 64 KiB y
+TLS. La ingesta acepta únicamente `Content-Type: application/json` y el
+contrato fijo de estación: canales `""`, `ch0` a `ch4` (todos numéricos) y,
+opcionalmente, `DeviceID`, `DeviceType`, `DeviceVersion` y `Timestamp`. Se
+rechazan campos extra, JSON duplicado, arreglos/objetos, valores no finitos,
+texto no numérico y contenido que intente usar el endpoint como subida de
+archivos o scripts. El payload original aceptado se conserva sin transformarlo
+en `raw_json`.
 
 La CSP mantiene scripts exclusivamente en el mismo origen. `style-src` permite
 estilos inline porque Boneyard calcula en ejecución la geometría responsive de

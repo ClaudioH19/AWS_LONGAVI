@@ -1,10 +1,10 @@
 import json
-import hmac
 import logging
 import shutil
 import sqlite3
 import threading
 from datetime import datetime, timezone
+from ipaddress import ip_address
 
 from flask import Blueprint, Response, abort, jsonify, request
 
@@ -12,7 +12,7 @@ from ..config import (
     CHILE_TZ,
     DEFAULT_RANGE_LIMIT,
     ENABLE_DIAGNOSTIC_ROUTES,
-    INGEST_API_KEY,
+    INGEST_ALLOWED_NETWORKS,
     MAX_EXPORT_LIMIT,
     MAX_RANGE_LIMIT,
     MAX_RANGE_OFFSET,
@@ -120,12 +120,21 @@ def _invalid_params_response(error):
     return jsonify({"error": "invalid_query", "message": str(error)}), 400
 
 
+def _ingest_source_is_allowed(remote_addr):
+    if not INGEST_ALLOWED_NETWORKS:
+        return True
+    try:
+        source = ip_address(remote_addr)
+    except ValueError:
+        return False
+    return any(source in network for network in INGEST_ALLOWED_NETWORKS)
+
+
 @bp.route("/weather", methods=["POST"])
 def receive_weather():
-    if INGEST_API_KEY:
-        provided_key = request.headers.get("X-Weather-Key", "")
-        if not hmac.compare_digest(provided_key, INGEST_API_KEY):
-            return jsonify({"error": "unauthorized", "message": "Credencial de estación inválida."}), 401
+    if not _ingest_source_is_allowed(request.remote_addr or ""):
+        logger.warning("Rejected weather payload from unauthorized source")
+        return jsonify({"error": "forbidden", "message": "Origen de estación no autorizado."}), 403
 
     try:
         if request.mimetype != "application/json":
