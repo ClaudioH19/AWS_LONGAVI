@@ -51,6 +51,10 @@ class WeatherApplicationTests(unittest.TestCase):
             json.dumps({key: value for key, value in VALID_PAYLOAD.items() if key != "ch4"}),
             json.dumps({**VALID_PAYLOAD, "DeviceID": "<script>alert(1)</script>"}),
             json.dumps({**VALID_PAYLOAD, "DeviceID": "=HYPERLINK(\"https://invalid\")"}),
+            json.dumps({**VALID_PAYLOAD, "channel5": 10}),
+            json.dumps({**VALID_PAYLOAD, "ch05": 10}),
+            json.dumps({**VALID_PAYLOAD, "ch5": "no-numérico"}),
+            json.dumps({**VALID_PAYLOAD, "Timestamp": "2026-01-257 11:24:23"}),
         )
         for payload in invalid_payloads:
             response = self.client.post("/weather", data=payload, content_type="application/json")
@@ -87,6 +91,26 @@ class WeatherApplicationTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.client.get("/health").get_json()["db_total_registros"], 1)
+
+    def test_03b_future_channels_and_legacy_timestamp_are_accepted(self):
+        payload = {
+            **VALID_PAYLOAD,
+            "Timestamp": "2026-09-257 11:24:23",
+            "ch5": "0",
+            "ch6": 0,
+            "ch20": "12.5",
+        }
+        response = self.client.post(
+            "/weather",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        latest = self.client.get("/weather/latest").get_json()
+        self.assertEqual(latest["Timestamp"], payload["Timestamp"])
+        self.assertNotIn("ch5", latest)
+        self.assertNotIn("ch6", latest)
+        self.assertNotIn("ch20", latest)
 
     def test_04_query_limits_and_dates_are_validated(self):
         self.assertEqual(self.client.get("/weather/range?limit=-1").status_code, 400)

@@ -21,12 +21,16 @@ Cuando no hay IP estable ni credencial posible, no se puede autenticar el
 origen del POST: un tercero podría imitar el JSON. En ese caso el proxy debe
 aplicar límite de tasa específico a `POST /weather`, cuerpo máximo de 64 KiB y
 TLS. La ingesta acepta únicamente `Content-Type: application/json` y el
-contrato fijo de estación: canales `""`, `ch0` a `ch4` (todos numéricos) y,
-opcionalmente, `DeviceID`, `DeviceType`, `DeviceVersion` y `Timestamp`. Se
-rechazan campos extra, JSON duplicado, arreglos/objetos, valores no finitos,
+contrato controlado de estación: canales `""`, `ch0` a `ch4` (todos numéricos) y,
+opcionalmente, `DeviceID`, `DeviceType`, `DeviceVersion` y `Timestamp`. Los
+canales futuros con forma `chN` se validan como numéricos y se conservan en el
+JSON original, aunque el panel sólo normaliza `ch0` a `ch4`. Se rechazan otros
+campos extra, JSON duplicado, arreglos/objetos, valores no finitos,
 texto no numérico y contenido que intente usar el endpoint como subida de
 archivos o scripts. El payload original aceptado se conserva sin transformarlo
-en `raw_json`.
+en `raw_json`. `Timestamp` admite fecha calendario (`YYYY-MM-DD`) y el formato
+legado del datalogger (`YYYY-MM-DDD`, donde `DDD` es el día del año); en este
+último se valida que el día del año pertenezca al mes declarado.
 
 La CSP mantiene scripts exclusivamente en el mismo origen. `style-src` permite
 estilos inline porque Boneyard calcula en ejecución la geometría responsive de

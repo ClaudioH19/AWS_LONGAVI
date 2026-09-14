@@ -44,9 +44,10 @@ docker compose up -d weather-server
 docker compose ps
 ```
 
-El servicio se publica de forma segura en `127.0.0.1:3000` para un proxy HTTPS
-ejecutado en el host. Usar `BIND_ADDRESS=0.0.0.0` sólo si el proxy vive en otro
-contenedor y el firewall impide acceso directo al puerto.
+La plantilla publica el servicio en `0.0.0.0:3000` para que IAGRO pueda
+consumirlo desde otro host. El puerto debe restringirse por firewall cuando el
+servidor IAGRO tenga una IP estable. Usar `BIND_ADDRESS=127.0.0.1` si todo el
+tráfico entra por un proxy ejecutado en este mismo host.
 
 Comprobaciones principales:
 
