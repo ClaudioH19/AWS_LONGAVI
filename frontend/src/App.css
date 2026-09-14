@@ -3,10 +3,10 @@
 :root {
   font-family: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   color-scheme: light;
-  --bg: #f8fafc;
-  --surface: #fafafa;
-  --surface-strong: #fafafa;
-  --border: #e5e7eb;
+  --bg: #f4f7f5;
+  --surface: rgba(255, 255, 255, 0.82);
+  --surface-strong: rgba(255, 255, 255, 0.94);
+  --border: rgba(2, 46, 35, 0.12);
   --border-muted: #eef1f3;
   --text: #022e23;
   --text-dim: #587067;
@@ -15,7 +15,15 @@
   --brand-soft: #dff3ec;
   --danger: #b42318;
   --warning: #a15c07;
-  --shadow: 0 4px 14px rgba(2, 46, 35, 0.07);
+  --weather-temperature: #c65d2e;
+  --weather-humidity: #2563eb;
+  --weather-rain: #0284c7;
+  --weather-radiation: #d89b14;
+  --weather-wind: #16815f;
+  --radius-panel: 22px;
+  --radius-card: 18px;
+  --radius-control: 12px;
+  --shadow: 0 18px 48px rgba(2, 46, 35, 0.07), 0 2px 8px rgba(2, 46, 35, 0.04);
 }
 
 html,
@@ -27,7 +35,10 @@ body,
 
 body {
   min-width: 320px;
-  background: var(--bg);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(4, 119, 86, 0.08), transparent 32rem),
+    radial-gradient(circle at 92% 12%, rgba(2, 132, 199, 0.06), transparent 28rem),
+    var(--bg);
 }
 
 * {
@@ -50,7 +61,7 @@ select:focus-visible {
 .app-shell {
   min-height: 100vh;
   color: var(--text);
-  background: var(--bg);
+  background: transparent;
 }
 
 .top-nav {
@@ -62,9 +73,9 @@ select:focus-visible {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.65rem 1.2rem;
-  background: rgba(250, 250, 250, 0.94);
+  background: rgba(250, 252, 251, 0.8);
   border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(10px);
+  backdrop-filter: saturate(140%) blur(18px);
 }
 
 .brand {
@@ -143,9 +154,10 @@ main {
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   padding: 0.8rem;
   box-shadow: var(--shadow);
+  backdrop-filter: saturate(125%) blur(16px);
 }
 
 .overview-stack {
@@ -223,10 +235,10 @@ main {
   display: grid;
   gap: 0.25rem;
   padding: 0.7rem;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   border: 1px solid var(--border);
   background: var(--surface-strong);
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62), 0 4px 14px rgba(2, 46, 35, 0.04);
 }
 
 .summary-card.is-safe {
@@ -328,8 +340,8 @@ main {
   display: inline-flex;
   gap: 0.25rem;
   padding: 0.2rem;
-  border-radius: 8px;
-  background: #ffffff;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.74);
   border: 1px solid var(--border);
   width: fit-content;
 }
@@ -337,7 +349,7 @@ main {
 .panel-nav button,
 .panel button {
   border: 1px solid rgba(26, 32, 28, 0.1);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   min-height: 34px;
   padding: 0.35rem 0.65rem;
   color: var(--text);
@@ -348,7 +360,7 @@ main {
 
 .panel-nav button {
   border-color: transparent;
-  border-radius: 6px;
+  border-radius: 10px;
   min-height: 32px;
   padding: 0.3rem 0.65rem;
   cursor: pointer;
@@ -398,7 +410,7 @@ main {
 .panel select,
 .panel button {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   min-height: 34px;
   padding: 0.3rem 0.6rem;
   color: var(--text);
@@ -488,14 +500,129 @@ main {
 .chart-canvas-shell {
   height: 350px;
   padding: 0.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   border: 1px solid var(--border);
-  background: #fafafa;
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .trend-stack {
   display: grid;
   gap: 0.85rem;
+}
+
+.fixed-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.weather-chart-card {
+  --chart-accent: var(--brand);
+  --chart-accent-ink: var(--brand);
+  --chart-accent-soft: rgba(4, 119, 86, 0.1);
+  position: relative;
+  display: grid;
+  gap: 0.7rem;
+  min-width: 0;
+  overflow: hidden;
+  padding: clamp(0.8rem, 1.2vw, 1.05rem);
+  border: 1px solid rgba(2, 46, 35, 0.11);
+  border-radius: 20px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(250, 252, 251, 0.76)),
+    var(--chart-accent-soft);
+  box-shadow: 0 12px 34px rgba(2, 46, 35, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.weather-chart-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--chart-accent);
+  opacity: 0.74;
+}
+
+.weather-chart-card.is-rain {
+  --chart-accent: var(--weather-rain);
+  --chart-accent-ink: var(--weather-rain);
+  --chart-accent-soft: rgba(2, 132, 199, 0.08);
+}
+
+.weather-chart-card.is-temperature {
+  --chart-accent: linear-gradient(90deg, var(--weather-temperature), var(--weather-humidity));
+  --chart-accent-ink: var(--weather-temperature);
+  --chart-accent-soft: rgba(198, 93, 46, 0.07);
+}
+
+.weather-chart-card.is-radiation {
+  --chart-accent: var(--weather-radiation);
+  --chart-accent-ink: #a16207;
+  --chart-accent-soft: rgba(216, 155, 20, 0.08);
+}
+
+.weather-chart-card.is-wind {
+  --chart-accent: var(--weather-wind);
+  --chart-accent-ink: var(--weather-wind);
+  --chart-accent-soft: rgba(22, 129, 95, 0.08);
+}
+
+.weather-chart-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.weather-chart-header > div {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.chart-kicker {
+  color: var(--chart-accent-ink);
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.weather-chart-header h3,
+.general-chart-view h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(0.98rem, 1.15vw, 1.18rem);
+  line-height: 1.2;
+}
+
+.weather-chart-header p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.weather-chart-canvas {
+  position: relative;
+  height: clamp(260px, 24vw, 340px);
+  min-width: 0;
+}
+
+.general-chart-view {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.general-chart-toolbar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 0;
+}
+
+.general-chart-toolbar select {
+  width: 100%;
 }
 
 .quality-alerts {
@@ -707,8 +834,9 @@ main {
 .daily-summary-scroll {
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fafafa;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 
 .daily-summary-table {
@@ -986,7 +1114,13 @@ td.device {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 980px) {
+  .fixed-chart-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
   .top-nav {
     padding: 0.9rem 1rem;
     align-items: flex-start;
@@ -1007,14 +1141,18 @@ td.device {
   }
 
   .chart-canvas-shell {
-    height: 320px;
+    height: 310px;
+  }
+
+  .weather-chart-canvas {
+    height: 310px;
   }
 
 }
 
 @media (max-width: 520px) {
   .summary-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .brand {
@@ -1033,6 +1171,7 @@ td.device {
 
   .panel {
     padding: 0.7rem;
+    border-radius: 18px;
   }
 
   .nav-status {
@@ -1061,8 +1200,27 @@ td.device {
   }
 
   .chart-canvas-shell {
-    height: 270px;
-    padding: 0.25rem;
+    height: 300px;
+    padding: 0.35rem;
+  }
+
+  .weather-chart-card {
+    padding: 0.75rem;
+    border-radius: 18px;
+  }
+
+  .weather-chart-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .weather-chart-header p {
+    text-align: left;
+  }
+
+  .general-chart-toolbar {
+    gap: 0.45rem;
   }
 
   .quality-alerts {
@@ -1070,35 +1228,60 @@ td.device {
   }
 }
 
-/* Pantallas de operación/TV: densidad legible a distancia sin limitar el panel. */
-@media (min-width: 1800px) {
-  :root {
-    font-size: 18px;
+/* Evita comprimir las tarjetas de resumen en teléfonos muy angostos. */
+@media (max-width: 360px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
   }
+}
 
-  .dashboard-section {
-    max-width: 2160px;
+/* Modo de operación para pantallas grandes: se activa con ?display=tv. */
+html.is-tv-display {
+  font-size: 18px;
+}
+
+.is-tv-display .top-nav {
+  position: relative;
+}
+
+.is-tv-display .weather-chart-canvas {
+  height: clamp(310px, 31vh, 450px);
+}
+
+@media (min-width: 1800px) {
+  .is-tv-display .dashboard-section {
+    max-width: 2400px;
     padding: 1.25rem 2rem 2rem;
   }
 
-  .top-nav {
+  .is-tv-display .top-nav {
     padding: 1rem 2rem;
   }
 
-  .summary-grid {
+  .is-tv-display .summary-grid {
     gap: 0.9rem;
   }
 
-  .panel {
+  .is-tv-display .panel {
     padding: 1rem;
   }
 
-  .chart-canvas-shell {
-    height: 440px;
+  .is-tv-display .fixed-chart-grid {
+    gap: 1rem;
   }
 
-  .table-wrap {
+  .is-tv-display .table-wrap {
     max-height: 650px;
+  }
+}
+
+@media (min-width: 2560px) and (min-height: 1400px) {
+  .is-tv-display .fixed-chart-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .is-tv-display .weather-chart-canvas {
+    height: clamp(360px, 27vh, 520px);
   }
 }
 

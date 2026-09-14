@@ -8,9 +8,17 @@ responsive está en `boneyard.config.json`.
 
 ```sh
 npm ci
+npm test
 npm run lint
 npm run build
 ```
+
+La vista adapta los gráficos automáticamente: en teléfonos muestra el comparador
+seleccionable y desde tablet/escritorio muestra cuatro gráficos fijos de siete
+días. Para una pantalla de operación o TV, abrir la URL con `?display=tv` (por
+ejemplo, `https://meteo.ejemplo.cl/?display=tv`). Este modo fuerza los cuatro
+gráficos y aumenta la escala tipográfica; en resoluciones 4K los distribuye en
+una sola fila.
 
 Para regenerar esqueletos pixel-perfect mientras corre `npm run dev`:
 

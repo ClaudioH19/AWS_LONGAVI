@@ -44,6 +44,15 @@ function App() {
   const [latest, setLatest] = useState(null);
   const [liveReading, setLiveReading] = useState(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
+  const displayMode = useMemo(() => {
+    const requestedMode = new URLSearchParams(window.location.search).get('display');
+    return requestedMode === 'tv' ? 'tv' : 'auto';
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('is-tv-display', displayMode === 'tv');
+    return () => document.documentElement.classList.remove('is-tv-display');
+  }, [displayMode]);
 
   useEffect(() => {
     let active = true;
@@ -139,7 +148,7 @@ function App() {
   );
 
   return (
-    <div className="app-shell min-h-screen">
+    <div className={`app-shell min-h-screen ${displayMode === 'tv' ? 'is-tv-display' : ''}`}>
       <header className="top-nav">
         <div className="brand">
           BIOVISION
@@ -173,7 +182,12 @@ function App() {
           </nav>
 
           {activeView === 'charts' ? (
-            <ChartsPanel refreshTick={refreshTick} status={status} liveReading={liveReading} />
+            <ChartsPanel
+              refreshTick={refreshTick}
+              status={status}
+              liveReading={liveReading}
+              displayMode={displayMode}
+            />
           ) : (
             <DataTable refreshTick={refreshTick} liveReading={liveReading} />
           )}
